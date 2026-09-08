@@ -2,4 +2,5 @@
 .env
 __pycache__
 simple_AI_agent.log
+skill_AI_Instructions.log
 
