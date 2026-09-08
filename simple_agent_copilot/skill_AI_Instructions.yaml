@@ -1,0 +1,18 @@
+# Skill AI Agent
+Create a skill called skill.md based on the structure used by Google Gemini model
+  - The skill will help the AI Agent when the user ask the question about the weather in a specific city and the local time in that city.
+  - The skill will the current weather information for the specified city and will get the local time in that city.
+Create a simple python code called skill_AI_agent.py that does the following:
+  - Wait for input from the terminal
+  - Using AI Agent that understands natural language input
+  - The AI Agent should invoke Google Gemini model
+  - Perform basic tasks such as answering questions and providing recommendations
+  - The AI Agent should go through the steps to use skill.md file to answer questions about the weather and local time in a specific city
+  - It should have a tool to answer 2 private questions about the user's house:
+    - The color of the house which is blue
+    - The city where the house is located which is San Jose
+  - Create a file called skill_AI_agent.log to log all the messages pass between AI Agent, LLM, tools, and skills:
+    - Include all the actual messages and details of the messages in the log file.
+    - Mask the API key in the log file for security purposes.
+    - Structure the log so it can be easily viewed by humans.
+    - Add a line with "=== PROMPT ===" to the log file to mark each prompt
