@@ -2,25 +2,46 @@
 
 ## Overview
 Build Travel Itinerary Builder as an autonomous, multi-agent AI pipeline designed to generate structured, multi-day vacation plans.
-1. The app will ask the user for city of origin, destination, interests, budget, departure date (optional), and duration then produce a complete itinerary.
-2. The app will group the activities geographically each day to prevent excessive travel time.
-3. The app will enforce strict budgetary boundaries.
-3. Build the app to use Gemini API.
-4. Create a README.md file to show how to run the app and how the app works
 
-## Implementation Requirements
-1. It should get the API Key from the environment variable GEMINI_API_KEY, model name from the environment variable GEMINI_MODEL, and fallback model name from the environment variable GEMINI_FALLBACK_MODEL. Use the fallback model name if the primary model name is not available.
-2. Use flask to build this application. Once the user submits the form, it will start generating the itinerary and display it in a user-friendly format in the same page.
-3. Store the information from each user request in a CSV file named usages.csv in the artifacts folder.
-4. Store the invocations, requests, and responses of the agent, skills, tools, models, and etc in a file named events.json in the artifacts folder. Show actual payload sent and received between entities as they are generated or received. The event logs should be store in a single line.
-5. Create a button to allow the user to download the generated itinerary as a text or PDF file.
-6. There should be a button or tab at the top of the page to switch between the current itinerary and the history of itineraries and the event logs.
-7. The Itineraries & Events logs page should show the the counts of itineraries created, successful runs, failed runs, and the number of event logs stored.
-8. Below the summary, there should be a table showing the itineraries created. Each row of the itinerary should show all the details for each run including the date and time it was created, the number of event logs created for that run.
-9. When the row is clicked, it should display the full itinerary for that run in a pop up window.
-10. When the events count in each row is clicked, all the event logs for that run should be shown in the second table below the itinerary table. Each row of the event log should show all the details for each request including the timestamp, event type, agent/source of the event, a short summary of the event log, and a "Payload" button to show details about the event log.
-11. When the "Payload" button is clicked, it should display the full payload for that event log in a pop up window.
-12. The pop up window should include a button to allow the user to copy the contents of the payload to the clipboard.
+Build the app to use Gemini API. Use flask to build this application.
+
+The app should have 2 pages selectable using the tab bar at the top of the page.
+
+### Page 1: Generate Itinerary
+- The user should be able to input:
+  - city of origin
+  - destination
+  - interests
+  - budget
+  - departure date (optional)
+  - duration
+- After the user submits the form, the app will display:
+  - A status indicator showing the current step in the itinerary generation process.
+  - The app will group the activities geographically each day to prevent excessive travel time.
+  - The app will enforce strict budgetary boundaries.
+  - The generated itinerary should be displayed in a user-friendly format in the same page.
+- Create a button to allow the user to download the generated itinerary as a text or PDF file.
+
+### Page 2: Itineraries & Events Logs
+This page is for displaying the past Itineraries and Event logs.
+- At the top of the page, there should be a summary of the number of itineraries requested, the number of itineraries generated, failed requests, and the number of events logged.
+- Below the summary, there should be two tables.
+- The first table should show the list of itineraries requested. Each row of the itinerary should show the request details including the date and time it was created, the travel date, the duration,  the destination, the city of origin, the budget, the estimated cost, status of the request, and the number of event logs created for that run.
+  - When the row is clicked, it should display the full itinerary for that run in a pop up window.
+  - When the events count in each row is clicked, all the event logs for that run should be shown in the second table below the itinerary table.
+
+- Each row of the event log should show the details for each request including the timestamp, event type, agent/source of the event, a short summary of the event log, and a "Payload" button to show details about the event log.
+  - When the "Payload" button is clicked, it should display the full payload for that event log in a pop up window.
+  - The pop up window should display all information stored in the event
+  - It should include a "Copy to Clipboard" button to allow the user to copy the contents of the payload to the clipboard.
+
+## Other Requirements
+- The app should get the API Key from the environment variable GEMINI_API_KEY, model name from the environment variable GEMINI_MODEL, and fallback model name from the environment variable GEMINI_FALLBACK_MODEL. Use the fallback model name if the primary model name is not available.
+- The app should store the information from each user request in a CSV file named usages.csv in the artifacts folder.
+- The app should store the events and interactions including the actual payload between the agent, skills, tools, models, and etc in a file named events.json in the artifacts folder.
+  - Each entry in the events.json file should be a separate JSON object, on its own line.
+  - The app should redact the API Key from the event payload before storing it in the events.json file. 
+- Create a README.md file to show how to run the app and how the app works
 
 ## Architecture
 The application follows a hybrid orchestration pattern, utilizing a **Sequential Pipeline** that coordinates a **Parallel Discovery Phase** followed by an iterative **Loop Refinement Phase**.
@@ -70,11 +91,3 @@ All agents interact with a single, centralized dictionary state:
   "budget_approved": "boolean"
 }
 ```
-
-##  Quality Evaluation
-
-The implementation is evaluated based on three milestones:
-
-- **Structural Integrity (40%)**: Must explicitly declare ParallelAgent and LoopAgent frameworks.
-- **Context Extraction & State Management (40%)**: The Scheduler must read critic_feedback from prior iterations to modify the trip successfully.
-- **Graceful Failure Handling (20%)**: Must handle impossible inputs (e.g., extremely low budgets) without crashing.
