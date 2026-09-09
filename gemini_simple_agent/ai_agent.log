@@ -1,15 +1,15 @@
-2026-09-08 19:37:09,887 [INFO] === PROMPT ===
-2026-09-08 19:37:09,887 [INFO] [2026-09-09T02:37:09.887613+00:00] USER -> AGENT (PROMPT)
+2026-09-08 21:31:37,205 [INFO] === PROMPT ===
+2026-09-08 21:31:37,206 [INFO] [2026-09-09T04:31:37.206175+00:00] USER -> AGENT (PROMPT_REQUEST)
 {
   "sender": "user",
   "recipient": "agent",
-  "message_type": "prompt",
+  "message_type": "prompt_request",
   "payload": {
-    "query": "what is the capital city of India"
+    "prompt": "What is the color of my house?"
   },
-  "timestamp": "2026-09-09T02:37:09.887613+00:00"
+  "timestamp": "2026-09-09T04:31:37.206175+00:00"
 }
-2026-09-08 19:37:09,920 [INFO] [2026-09-09T02:37:09.920389+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
+2026-09-08 21:31:37,222 [INFO] [2026-09-09T04:31:37.222189+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
 {
   "sender": "agent",
   "recipient": "llm",
@@ -17,156 +17,135 @@
   "payload": {
     "iteration": 1,
     "model": "gemma-4-26b-a4b-it",
-    "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
-    "tools": [
-      {
-        "name": "get_private_house_information",
-        "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
-        "parameters": {
-          "properties": {
-            "question": {
-              "description": "The specific question or topic regarding the user's house.",
-              "type": "STRING"
-            }
-          },
-          "required": [
-            "question"
-          ],
-          "type": "OBJECT"
-        }
-      }
-    ],
     "contents": [
       {
         "parts": [
           {
-            "text": "what is the capital city of India"
+            "text": "What is the color of my house?"
           }
         ],
         "role": "user"
       }
-    ]
+    ],
+    "config": {
+      "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
+      "temperature": 0.7,
+      "tools": [
+        {
+          "function_declarations": [
+            {
+              "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
+              "name": "get_private_house_information",
+              "parameters": {
+                "properties": {
+                  "question": {
+                    "description": "The specific question or topic regarding the user's house.",
+                    "type": "STRING"
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "type": "OBJECT"
+              }
+            }
+          ]
+        }
+      ]
+    }
   },
-  "timestamp": "2026-09-09T02:37:09.920389+00:00"
+  "timestamp": "2026-09-09T04:31:37.222189+00:00"
 }
-2026-09-08 19:37:11,531 [INFO] [2026-09-09T02:37:11.531213+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
+2026-09-08 21:31:39,757 [INFO] [2026-09-09T04:31:39.757046+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
 {
   "sender": "llm",
   "recipient": "agent",
   "message_type": "generate_content_response",
   "payload": {
-    "iteration": 1,
-    "text": "The capital city of India is New Delhi.",
-    "function_calls": []
-  },
-  "timestamp": "2026-09-09T02:37:11.531213+00:00"
-}
-2026-09-08 19:37:11,531 [INFO] [2026-09-09T02:37:11.531879+00:00] AGENT -> USER (FINAL_RESPONSE)
-{
-  "sender": "agent",
-  "recipient": "user",
-  "message_type": "final_response",
-  "payload": {
-    "response": "The capital city of India is New Delhi."
-  },
-  "timestamp": "2026-09-09T02:37:11.531879+00:00"
-}
-2026-09-08 19:39:56,741 [INFO] === PROMPT ===
-2026-09-08 19:39:56,741 [INFO] [2026-09-09T02:39:56.741454+00:00] USER -> AGENT (PROMPT)
-{
-  "sender": "user",
-  "recipient": "agent",
-  "message_type": "prompt",
-  "payload": {
-    "query": "what is the color of my house?"
-  },
-  "timestamp": "2026-09-09T02:39:56.741454+00:00"
-}
-2026-09-08 19:39:56,741 [INFO] [2026-09-09T02:39:56.741859+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
-{
-  "sender": "agent",
-  "recipient": "llm",
-  "message_type": "generate_content_request",
-  "payload": {
-    "iteration": 1,
-    "model": "gemma-4-26b-a4b-it",
-    "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
-    "tools": [
+    "sdk_http_response": {
+      "headers": {
+        "x-gemini-service-tier": "standard",
+        "content-type": "application/json; charset=UTF-8",
+        "vary": "Origin, X-Origin, Referer",
+        "content-encoding": "gzip",
+        "date": "Wed, 09 Sep 2026 04:31:39 GMT",
+        "server": "scaffolding on HTTPServer2",
+        "x-xss-protection": "0",
+        "x-frame-options": "SAMEORIGIN",
+        "x-content-type-options": "nosniff",
+        "server-timing": "gfet4t7; dur=2317",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "transfer-encoding": "chunked"
+      }
+    },
+    "candidates": [
       {
-        "name": "get_private_house_information",
-        "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
-        "parameters": {
-          "properties": {
-            "question": {
-              "description": "The specific question or topic regarding the user's house.",
-              "type": "STRING"
+        "content": {
+          "parts": [
+            {
+              "text": "The user is asking about the color of their house.\nThe available tool `get_private_house_information` is designed to answer private questions about the user's house, including its color.\nTherefore, I should call this tool with the question \"What is the color of my house?\".",
+              "thought": true
+            },
+            {
+              "function_call": {
+                "id": "call_592226",
+                "args": {
+                  "question": "What is the color of my house?"
+                },
+                "name": "get_private_house_information"
+              },
+              "thought_signature": "EiYKJGUyNDgzMGE3LTVjZDYtNDJmZS05OThiLWVlNTM5ZTcyYjljMw=="
             }
-          },
-          "required": [
-            "question"
           ],
-          "type": "OBJECT"
-        }
+          "role": "model"
+        },
+        "finish_reason": "STOP",
+        "index": 0
       }
     ],
-    "contents": [
-      {
-        "parts": [
-          {
-            "text": "what is the color of my house?"
-          }
-        ],
-        "role": "user"
-      }
-    ]
-  },
-  "timestamp": "2026-09-09T02:39:56.741859+00:00"
-}
-2026-09-08 19:39:59,173 [INFO] [2026-09-09T02:39:59.173785+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
-{
-  "sender": "llm",
-  "recipient": "agent",
-  "message_type": "generate_content_response",
-  "payload": {
-    "iteration": 1,
-    "text": "The user is asking about the color of their house.\nI have a tool called `get_private_house_information` which is designed to answer private questions about the user's house, including the house color.\nTherefore, I should call this tool with the question \"what is the color of my house?\".",
-    "function_calls": [
-      {
-        "name": "get_private_house_information",
-        "args": {
-          "question": "what is the color of my house?"
+    "model_version": "gemma-4-26b-a4b-it",
+    "response_id": "KeGgarLYGaCo1MkP8d6LSA",
+    "usage_metadata": {
+      "candidates_token_count": 27,
+      "prompt_token_count": 173,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 173
         }
-      }
-    ]
+      ],
+      "thoughts_token_count": 61,
+      "total_token_count": 261
+    },
+    "iteration": 1
   },
-  "timestamp": "2026-09-09T02:39:59.173785+00:00"
+  "timestamp": "2026-09-09T04:31:39.757046+00:00"
 }
-2026-09-08 19:39:59,174 [INFO] [2026-09-09T02:39:59.174114+00:00] AGENT -> TOOL:GET_PRIVATE_HOUSE_INFORMATION (TOOL_CALL)
+2026-09-08 21:31:39,758 [INFO] [2026-09-09T04:31:39.758067+00:00] AGENT -> TOOL:GET_PRIVATE_HOUSE_INFORMATION (TOOL_REQUEST)
 {
   "sender": "agent",
   "recipient": "tool:get_private_house_information",
-  "message_type": "tool_call",
+  "message_type": "tool_request",
   "payload": {
+    "function": "get_private_house_information",
     "arguments": {
-      "question": "what is the color of my house?"
+      "question": "What is the color of my house?"
     }
   },
-  "timestamp": "2026-09-09T02:39:59.174114+00:00"
+  "timestamp": "2026-09-09T04:31:39.758067+00:00"
 }
-2026-09-08 19:39:59,174 [INFO] [2026-09-09T02:39:59.174350+00:00] TOOL:GET_PRIVATE_HOUSE_INFORMATION -> AGENT (TOOL_RESPONSE)
+2026-09-08 21:31:39,758 [INFO] [2026-09-09T04:31:39.758383+00:00] TOOL:GET_PRIVATE_HOUSE_INFORMATION -> AGENT (TOOL_RESPONSE)
 {
   "sender": "tool:get_private_house_information",
   "recipient": "agent",
   "message_type": "tool_response",
   "payload": {
-    "result": {
-      "house_color": "blue",
-      "answer": "The house color is blue."
-    }
+    "house_color": "blue",
+    "answer": "The house color is blue."
   },
-  "timestamp": "2026-09-09T02:39:59.174350+00:00"
+  "timestamp": "2026-09-09T04:31:39.758383+00:00"
 }
-2026-09-08 19:39:59,177 [INFO] [2026-09-09T02:39:59.176879+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
+2026-09-08 21:31:39,760 [INFO] [2026-09-09T04:31:39.760576+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
 {
   "sender": "agent",
   "recipient": "llm",
@@ -174,30 +153,11 @@
   "payload": {
     "iteration": 2,
     "model": "gemma-4-26b-a4b-it",
-    "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
-    "tools": [
-      {
-        "name": "get_private_house_information",
-        "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
-        "parameters": {
-          "properties": {
-            "question": {
-              "description": "The specific question or topic regarding the user's house.",
-              "type": "STRING"
-            }
-          },
-          "required": [
-            "question"
-          ],
-          "type": "OBJECT"
-        }
-      }
-    ],
     "contents": [
       {
         "parts": [
           {
-            "text": "what is the color of my house?"
+            "text": "What is the color of my house?"
           }
         ],
         "role": "user"
@@ -205,18 +165,18 @@
       {
         "parts": [
           {
-            "text": "The user is asking about the color of their house.\nI have a tool called `get_private_house_information` which is designed to answer private questions about the user's house, including the house color.\nTherefore, I should call this tool with the question \"what is the color of my house?\".",
+            "text": "The user is asking about the color of their house.\nThe available tool `get_private_house_information` is designed to answer private questions about the user's house, including its color.\nTherefore, I should call this tool with the question \"What is the color of my house?\".",
             "thought": true
           },
           {
             "function_call": {
-              "id": "call_489191",
+              "id": "call_592226",
               "args": {
-                "question": "what is the color of my house?"
+                "question": "What is the color of my house?"
               },
               "name": "get_private_house_information"
             },
-            "thought_signature": "b'\\x12&\\n$e24830a7-5cd6-42fe-998b-ee539e72b9c3'"
+            "thought_signature": "EiYKJGUyNDgzMGE3LTVjZDYtNDJmZS05OThiLWVlNTM5ZTcyYjljMw=="
           }
         ],
         "role": "model"
@@ -235,23 +195,90 @@
         ],
         "role": "user"
       }
-    ]
+    ],
+    "config": {
+      "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
+      "temperature": 0.7,
+      "tools": [
+        {
+          "function_declarations": [
+            {
+              "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
+              "name": "get_private_house_information",
+              "parameters": {
+                "properties": {
+                  "question": {
+                    "description": "The specific question or topic regarding the user's house.",
+                    "type": "STRING"
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "type": "OBJECT"
+              }
+            }
+          ]
+        }
+      ]
+    }
   },
-  "timestamp": "2026-09-09T02:39:59.176879+00:00"
+  "timestamp": "2026-09-09T04:31:39.760576+00:00"
 }
-2026-09-08 19:39:59,724 [INFO] [2026-09-09T02:39:59.724031+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
+2026-09-08 21:31:40,492 [INFO] [2026-09-09T04:31:40.492512+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
 {
   "sender": "llm",
   "recipient": "agent",
   "message_type": "generate_content_response",
   "payload": {
-    "iteration": 2,
-    "text": "Your house is blue!",
-    "function_calls": []
+    "sdk_http_response": {
+      "headers": {
+        "x-gemini-service-tier": "standard",
+        "content-type": "application/json; charset=UTF-8",
+        "vary": "Origin, X-Origin, Referer",
+        "content-encoding": "gzip",
+        "date": "Wed, 09 Sep 2026 04:31:40 GMT",
+        "server": "scaffolding on HTTPServer2",
+        "x-xss-protection": "0",
+        "x-frame-options": "SAMEORIGIN",
+        "x-content-type-options": "nosniff",
+        "server-timing": "gfet4t7; dur=709",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "transfer-encoding": "chunked"
+      }
+    },
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Your house is blue!"
+            }
+          ],
+          "role": "model"
+        },
+        "finish_reason": "STOP",
+        "index": 0
+      }
+    ],
+    "model_version": "gemma-4-26b-a4b-it",
+    "response_id": "K-Ggapu6NK7H1MkPsLT8mAY",
+    "usage_metadata": {
+      "candidates_token_count": 5,
+      "prompt_token_count": 353,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 353
+        }
+      ],
+      "total_token_count": 358
+    },
+    "iteration": 2
   },
-  "timestamp": "2026-09-09T02:39:59.724031+00:00"
+  "timestamp": "2026-09-09T04:31:40.492512+00:00"
 }
-2026-09-08 19:39:59,724 [INFO] [2026-09-09T02:39:59.724496+00:00] AGENT -> USER (FINAL_RESPONSE)
+2026-09-08 21:31:40,494 [INFO] [2026-09-09T04:31:40.494500+00:00] AGENT -> USER (FINAL_RESPONSE)
 {
   "sender": "agent",
   "recipient": "user",
@@ -259,20 +286,20 @@
   "payload": {
     "response": "Your house is blue!"
   },
-  "timestamp": "2026-09-09T02:39:59.724496+00:00"
+  "timestamp": "2026-09-09T04:31:40.494500+00:00"
 }
-2026-09-08 19:49:43,221 [INFO] === PROMPT ===
-2026-09-08 19:49:43,221 [INFO] [2026-09-09T02:49:43.221522+00:00] USER -> AGENT (PROMPT)
+2026-09-08 21:33:55,662 [INFO] === PROMPT ===
+2026-09-08 21:33:55,665 [INFO] [2026-09-09T04:33:55.665461+00:00] USER -> AGENT (PROMPT_REQUEST)
 {
   "sender": "user",
   "recipient": "agent",
-  "message_type": "prompt",
+  "message_type": "prompt_request",
   "payload": {
-    "query": "what is the time in India now?"
+    "prompt": "what is the capital city of Russia?"
   },
-  "timestamp": "2026-09-09T02:49:43.221522+00:00"
+  "timestamp": "2026-09-09T04:33:55.665461+00:00"
 }
-2026-09-08 19:49:43,222 [INFO] [2026-09-09T02:49:43.222629+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
+2026-09-08 21:33:55,707 [INFO] [2026-09-09T04:33:55.707566+00:00] AGENT -> LLM (GENERATE_CONTENT_REQUEST)
 {
   "sender": "agent",
   "recipient": "llm",
@@ -280,57 +307,110 @@
   "payload": {
     "iteration": 1,
     "model": "gemma-4-26b-a4b-it",
-    "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
-    "tools": [
-      {
-        "name": "get_private_house_information",
-        "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
-        "parameters": {
-          "properties": {
-            "question": {
-              "description": "The specific question or topic regarding the user's house.",
-              "type": "STRING"
-            }
-          },
-          "required": [
-            "question"
-          ],
-          "type": "OBJECT"
-        }
-      }
-    ],
     "contents": [
       {
         "parts": [
           {
-            "text": "what is the time in India now?"
+            "text": "what is the capital city of Russia?"
           }
         ],
         "role": "user"
       }
-    ]
+    ],
+    "config": {
+      "system_instruction": "You are a friendly and knowledgeable AI Assistant. You understand natural language, answer general questions, and provide helpful recommendations. You also have access to a tool called 'get_private_house_information' to retrieve private facts about the user's house (such as its color and city location). Always invoke this tool whenever the user inquires about their house.",
+      "temperature": 0.7,
+      "tools": [
+        {
+          "function_declarations": [
+            {
+              "description": "Answer private questions about the user's house, including the house color (which is blue) and the city where the house is located (which is San Jose).",
+              "name": "get_private_house_information",
+              "parameters": {
+                "properties": {
+                  "question": {
+                    "description": "The specific question or topic regarding the user's house.",
+                    "type": "STRING"
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "type": "OBJECT"
+              }
+            }
+          ]
+        }
+      ]
+    }
   },
-  "timestamp": "2026-09-09T02:49:43.222629+00:00"
+  "timestamp": "2026-09-09T04:33:55.707566+00:00"
 }
-2026-09-08 19:49:53,697 [INFO] [2026-09-09T02:49:53.697806+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
+2026-09-08 21:33:57,228 [INFO] [2026-09-09T04:33:57.228353+00:00] LLM -> AGENT (GENERATE_CONTENT_RESPONSE)
 {
   "sender": "llm",
   "recipient": "agent",
   "message_type": "generate_content_response",
   "payload": {
-    "iteration": 1,
-    "text": "India is in the Indian Standard Time (IST) zone, which is **UTC+5:30**. \n\nSince I don't have a real-time clock, I recommend checking a search engine or your device's clock for the exact current time in India.",
-    "function_calls": []
+    "sdk_http_response": {
+      "headers": {
+        "x-gemini-service-tier": "standard",
+        "content-type": "application/json; charset=UTF-8",
+        "vary": "Origin, X-Origin, Referer",
+        "content-encoding": "gzip",
+        "date": "Wed, 09 Sep 2026 04:33:57 GMT",
+        "server": "scaffolding on HTTPServer2",
+        "x-xss-protection": "0",
+        "x-frame-options": "SAMEORIGIN",
+        "x-content-type-options": "nosniff",
+        "server-timing": "gfet4t7; dur=1398",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "transfer-encoding": "chunked"
+      }
+    },
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "The user is asking for the capital city of Russia. This is a general knowledge question and does not involve any information about the user's house. I should provide the direct answer.",
+              "thought": true
+            },
+            {
+              "text": "The capital city of Russia is Moscow."
+            }
+          ],
+          "role": "model"
+        },
+        "finish_reason": "STOP",
+        "index": 0
+      }
+    ],
+    "model_version": "gemma-4-26b-a4b-it",
+    "response_id": "s-GgatqlNsjVjMcPpYmkiQM",
+    "usage_metadata": {
+      "candidates_token_count": 8,
+      "prompt_token_count": 173,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 173
+        }
+      ],
+      "thoughts_token_count": 37,
+      "total_token_count": 218
+    },
+    "iteration": 1
   },
-  "timestamp": "2026-09-09T02:49:53.697806+00:00"
+  "timestamp": "2026-09-09T04:33:57.228353+00:00"
 }
-2026-09-08 19:49:53,698 [INFO] [2026-09-09T02:49:53.698299+00:00] AGENT -> USER (FINAL_RESPONSE)
+2026-09-08 21:33:57,229 [INFO] [2026-09-09T04:33:57.229031+00:00] AGENT -> USER (FINAL_RESPONSE)
 {
   "sender": "agent",
   "recipient": "user",
   "message_type": "final_response",
   "payload": {
-    "response": "India is in the Indian Standard Time (IST) zone, which is **UTC+5:30**. \n\nSince I don't have a real-time clock, I recommend checking a search engine or your device's clock for the exact current time in India."
+    "response": "The capital city of Russia is Moscow."
   },
-  "timestamp": "2026-09-09T02:49:53.698299+00:00"
+  "timestamp": "2026-09-09T04:33:57.229031+00:00"
 }

@@ -1,5 +1,5 @@
 # Skill AI Agent
-Create a skill called skill_2.md based on the structure used by Google Gemini model
+Create a skill called skill_2.md based on the structure used by Google Gemini model:
   - The skill will help the AI Agent when the user asks the question about the weather in a specific city and the local time in that city.
   - The skill will be the current weather information for the specified city and will get the local time in that city.
 Create a simple python code called skill_agent_call.py that does the following:
@@ -13,7 +13,7 @@ Create a simple python code called skill_agent_call.py that does the following:
     - The color of the house which is blue
     - The city where the house is located which is San Jose
   - Create a file called skill_agent_call.log to log all the messages pass between AI Agent, LLM, tools, and skills:
-    - Include the actual messages between agent, LLM, tools, and skills.
+    - Include the actual requests and responses payload passed between agent, LLM, tools, and skills.
     - Mask the API key in the log file for security purposes.
     - Structure the log so it can be easily viewed by humans.
     - Add a line with "=== PROMPT ===" to the log file to mark each prompt

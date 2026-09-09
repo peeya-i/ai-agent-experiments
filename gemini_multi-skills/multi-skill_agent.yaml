@@ -12,8 +12,8 @@ Create a simple python code called skill_agent_call.py that does the following:
   - The skills should be selected by the LLM 
   - Perform basic tasks such as answering questions and providing recommendations
   - The AI Agent should go through the steps to select the skills and use them to answer questions that may require multiple steps to answer
-  - Create a file called multi-skill_agent.log to log all the messages pass between AI Agent, LLM, tools, and skills. The code for logging should be in a file called logging.py:
-    - Include the actual messages between agent, LLM, tools, and skills.
+  - Create a file called multi-skill_agent.log to log all the messages pass between AI Agent, LLM, tools, and skills. Put the code in logging.py file that will be called from the main program:
+    - Include the actual requests and responses payload passed between agent, LLM, tools, and skills.
     - Mask the API key in the log file for security purposes.
     - Structure the log so it can be easily viewed by humans.
     - Add a line with "=== PROMPT ===" to the log file to mark each prompt

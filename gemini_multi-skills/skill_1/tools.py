@@ -15,14 +15,30 @@ import urllib.request
 import zoneinfo
 from typing import Any
 
-# Import logging functions from the logging module
-try:
-    from logging import log_event  # type: ignore
-except ImportError:
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from logging import log_event  # type: ignore
+# Logger callback mechanism for recording tool events
+_logger_callback = None
+
+
+def set_logger(callback: Any) -> None:
+    """Register logger callback function for tool event tracking."""
+    global _logger_callback
+    _logger_callback = callback
+
+
+def log_event(sender: str, recipient: str, message_type: str, payload: Any = None) -> None:
+    """Forward event to registered logger callback or logging.py if available."""
+    if _logger_callback is not None:
+        try:
+            _logger_callback(sender, recipient, message_type, payload)
+            return
+        except Exception:
+            pass
+    try:
+        import logging as _log_module
+        if hasattr(_log_module, "log_event"):
+            _log_module.log_event(sender, recipient, message_type, payload)
+    except Exception:
+        pass
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
@@ -65,7 +81,7 @@ CITY_TIMEZONES: dict[str, str] = {
 
 def get_weather(city: str) -> dict[str, Any]:
     """Retrieve current weather observation for a specified city (temperature, condition, humidity, wind)."""
-    log_event("agent", "skill_1:weather", "tool_call", {"city": city})
+    log_event("agent", "skill_1:weather", "tool_request", {"city": city})
     clean_city = city.strip()
     encoded_city = urllib.parse.quote(clean_city)
 
@@ -123,7 +139,7 @@ def get_weather(city: str) -> dict[str, Any]:
 
 def get_local_time(city: str) -> dict[str, Any]:
     """Retrieve current local time, date, and timezone for a specified city."""
-    log_event("agent", "skill_1:local_time", "tool_call", {"city": city})
+    log_event("agent", "skill_1:local_time", "tool_request", {"city": city})
     clean_city = city.strip().lower()
 
     tz_name = CITY_TIMEZONES.get(clean_city)

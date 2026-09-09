@@ -6,15 +6,19 @@ Implements a terminal AI agent that accepts natural language input, utilizes the
 supports LLM skill selection and multi-step reasoning across multiple skills
 (skill_1: weather and local time; skill_2: house information), provides general
 recommendations and answers, and logs all message flows to `multi-skill_agent.log`
-via `logging.py` with security-masked API keys.
+with security-masked API keys.
 """
 
 from __future__ import annotations
 
 import datetime
+import json
+import logging
 import os
+import re
 import sys
 import warnings
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -34,35 +38,51 @@ API_KEY = os.getenv("GOOGLE_API_KEY", "")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 MODEL_NAME = os.getenv("MODEL", "gemma-4-26b-a4b-it")
 FALLBACK_MODEL_NAME = os.getenv("FALLBACK_MODEL", "gemini-3.5-flash-lite")
+LOG_FILE = BASE_DIR / "multi-skill_agent.log"
 
 if not API_KEY:
     print("[!] Error: GOOGLE_API_KEY is not set. Please configure it in .env or environment.")
     sys.exit(1)
 
-# Ensure current directory is on sys.path so logging.py and skill modules are found
+# Ensure current directory is on sys.path so skill modules are found
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-# Import logging infrastructure from logging.py
-import logging as custom_logging
-from logging import log_event, log_prompt, setup_agent_logger
 
-# Initialize agent logger for multi-skill_agent.log
-setup_agent_logger()
+# -----------------------------------------------------------------------------
+# Logging Infrastructure (from logging.py per multi-skill_agent.yaml)
+# -----------------------------------------------------------------------------
+# Import the logging code from logging.py that is called from the main program
+from logging import (
+    ApiKeyMaskingFilter,
+    LogEvent,
+    log_event,
+    log_prompt,
+    setup_agent_logger,
+    to_serializable,
+)
 
-# Google ADK imports
+
+# -----------------------------------------------------------------------------
+# Google ADK Imports & Skill Tools Wiring
+# -----------------------------------------------------------------------------
 from google.adk.agents import Agent
 from google.adk.models import Gemini
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-# Import tools from skill folders
+import skill_1.tools
+import skill_2.tools
 from skill_1.tools import get_local_time, get_weather
 from skill_2.tools import get_house_city, get_house_color, get_private_house_information
 
+# Register logger callback with skill tools
+skill_1.tools.set_logger(log_event)
+skill_2.tools.set_logger(log_event)
+
 
 # -----------------------------------------------------------------------------
-# Skill Selection Tool (Allows LLM to select active skills)
+# Skill Selection Tool (Allows LLM to inspect and select active skills)
 # -----------------------------------------------------------------------------
 def select_skill(skill_name: str) -> dict[str, Any]:
     """Select and activate a skill by name to inspect its instructions and tools.
@@ -70,7 +90,7 @@ def select_skill(skill_name: str) -> dict[str, Any]:
     Args:
         skill_name: 'skill_1' (for weather & local time) or 'skill_2' (for house questions).
     """
-    log_event("agent", f"skill_selector:{skill_name}", "tool_call", {"skill_name": skill_name})
+    log_event("agent", f"skill_selector:{skill_name}", "tool_request", {"skill_name": skill_name})
     clean = skill_name.strip().lower()
 
     if "1" in clean or "weather" in clean or "time" in clean:
@@ -124,6 +144,60 @@ def select_skill(skill_name: str) -> dict[str, Any]:
 
 
 # -----------------------------------------------------------------------------
+# Logging Gemini Model (captures actual request & response payloads with LLM)
+# -----------------------------------------------------------------------------
+from typing import AsyncGenerator
+from google.adk.models import LlmRequest, LlmResponse
+
+
+class LoggingGemini(Gemini):
+    """Gemini model adapter that logs the exact request and response payloads exchanged with the LLM."""
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        # Log actual request payload sent from agent to LLM
+        req_contents = [to_serializable(c) for c in (llm_request.contents or [])]
+        req_tools = (
+            [to_serializable(t) for t in (llm_request.config.tools or [])]
+            if (llm_request.config and getattr(llm_request.config, "tools", None))
+            else None
+        )
+        req_payload: dict[str, Any] = {
+            "model": llm_request.model,
+            "contents": req_contents,
+        }
+        if req_tools:
+            req_payload["tools"] = req_tools
+
+        log_event(
+            sender="agent",
+            recipient="llm",
+            message_type="generate_content_request",
+            payload=req_payload,
+        )
+
+        async for response in super().generate_content_async(llm_request, stream=stream):
+            resp_content = to_serializable(getattr(response, "content", None))
+            resp_payload: dict[str, Any] = {
+                "model_version": getattr(response, "model_version", None),
+                "finish_reason": str(getattr(response, "finish_reason", "")),
+                "content": resp_content,
+            }
+            usage = getattr(response, "usage_metadata", None)
+            if usage:
+                resp_payload["usage_metadata"] = to_serializable(usage)
+
+            log_event(
+                sender="llm",
+                recipient="agent",
+                message_type="generate_content_response",
+                payload=resp_payload,
+            )
+            yield response
+
+
+# -----------------------------------------------------------------------------
 # All Tools List (passed in the tools parameter to Agent)
 # -----------------------------------------------------------------------------
 ALL_TOOLS: list[Callable[..., Any]] = [
@@ -141,12 +215,6 @@ ALL_TOOLS: list[Callable[..., Any]] = [
 # -----------------------------------------------------------------------------
 def build_agent_instruction() -> str:
     """Build comprehensive agent instructions including multi-skill orchestration."""
-    skill_1_path = BASE_DIR / "skill_1" / "skill_1.md"
-    skill_2_path = BASE_DIR / "skill_2" / "skill_2.md"
-
-    skill_1_content = skill_1_path.read_text(encoding="utf-8") if skill_1_path.exists() else ""
-    skill_2_content = skill_2_path.read_text(encoding="utf-8") if skill_2_path.exists() else ""
-
     instruction = (
         "You are an intelligent, helpful multi-skill AI Assistant. "
         "You understand natural language input, answer general questions, and provide recommendations.\n\n"
@@ -199,7 +267,7 @@ class MultiSkillAgentManager:
         # Using the Agent method from google.adk.agents with tools passed in the tools parameter
         self.agent = Agent(
             name="multi_skill_agent",
-            model=Gemini(model=self.active_model),
+            model=LoggingGemini(model=self.active_model),
             tools=self.tools,  # Tools passed to the agent in the tools parameter
             instruction=self.instruction,
         )
@@ -228,18 +296,6 @@ class MultiSkillAgentManager:
 
     def execute_turn(self, user_query: str) -> str:
         """Execute one conversational turn, logging message exchanges between agent, LLM, and tools."""
-        tool_names = [getattr(t, "__name__", str(t)) for t in self.tools]
-        log_event(
-            sender="agent",
-            recipient="llm",
-            message_type="adk_agent_request",
-            payload={
-                "model": self.active_model,
-                "tools": tool_names,
-                "user_message": user_query,
-            },
-        )
-
         try:
             response = self._run_turn_internal(user_query)
             # If primary model returned empty response (e.g. quota limit error caught internally by runner)
@@ -279,16 +335,6 @@ class MultiSkillAgentManager:
                 continue
 
             for part in event.content.parts:
-                # Log tool function calls requested by LLM
-                func_call = getattr(part, "function_call", None)
-                if func_call:
-                    log_event(
-                        sender="llm",
-                        recipient="agent",
-                        message_type="function_call_requested",
-                        payload={"name": func_call.name, "args": func_call.args},
-                    )
-
                 # Capture final text parts from model (ignoring internal thoughts)
                 text = getattr(part, "text", None)
                 if text and not getattr(part, "thought", False):
@@ -299,12 +345,6 @@ class MultiSkillAgentManager:
             raise RuntimeError(f"Model '{self.active_model}' returned empty response or encountered an error.")
 
         clean_response = final_response_text.strip()
-        log_event(
-            sender="llm",
-            recipient="agent",
-            message_type="adk_agent_response",
-            payload={"response_text": clean_response},
-        )
         return clean_response
 
 

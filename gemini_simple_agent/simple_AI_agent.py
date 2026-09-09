@@ -14,6 +14,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -45,12 +46,22 @@ if not API_KEY:
 # Logging System
 # -----------------------------------------------------------------------------
 class ApiKeyMaskingFilter(logging.Filter):
-    """Masks the API key anywhere it appears in log records."""
+    """Masks API keys and secrets anywhere they appear in log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
-        if API_KEY:
+        if API_KEY and len(API_KEY) > 5:
             message = message.replace(API_KEY, "[REDACTED_API_KEY]")
+
+        # Pattern-based masking for Google API keys (AIza... and AQ....)
+        message = re.sub(r"AIza[0-9A-Za-z\-_]{30,45}", "[REDACTED_GOOGLE_API_KEY]", message)
+        message = re.sub(r"AQ\.[0-9A-Za-z\-_]{30,}", "[REDACTED_GOOGLE_API_KEY]", message)
+        # Pattern-based masking for generic authorization tokens
+        message = re.sub(
+            r'(?i)(["\']?(?:api_?key|token|secret|password|auth|authorization)["\']?\s*[:=]\s*["\'])([a-zA-Z0-9_\-.\/]{12,})(["\'])',
+            r'\1[REDACTED_KEY]\3',
+            message,
+        )
         record.msg = message
         record.args = ()
         return True
@@ -86,29 +97,45 @@ class LogEvent:
 
 
 def to_serializable(val: Any) -> Any:
-    """Convert SDK types or objects into clean JSON-serializable dictionaries."""
+    """Recursively convert SDK types, objects, or structures into clean JSON-serializable types."""
     if val is None or isinstance(val, (str, int, float, bool)):
         return val
-    if hasattr(val, "value") and isinstance(val.value, (str, int, float, bool)):
-        return val.value
+    if isinstance(val, bytes):
+        return val.hex()
+    if isinstance(val, (datetime.date, datetime.datetime)):
+        return val.isoformat()
     if hasattr(val, "model_dump"):
         try:
-            return to_serializable(val.model_dump(exclude_none=True))
+            return to_serializable(val.model_dump(mode="json", exclude_none=True))
         except Exception:
-            pass
+            try:
+                return to_serializable(val.model_dump(exclude_none=True))
+            except Exception:
+                pass
+    if hasattr(val, "value") and isinstance(val.value, (str, int, float, bool)):
+        return val.value
     if hasattr(val, "to_json_dict"):
         try:
             return to_serializable(val.to_json_dict())
         except Exception:
             pass
     if isinstance(val, dict):
-        return {str(k): to_serializable(v) for k, v in val.items()}
+        return {str(k): to_serializable(v) for k, v in val.items() if v is not None}
     if isinstance(val, (list, tuple, set)):
         return [to_serializable(item) for item in val]
+    if hasattr(val, "__dict__"):
+        try:
+            return {
+                str(k): to_serializable(v)
+                for k, v in val.__dict__.items()
+                if not k.startswith("_") and v is not None
+            }
+        except Exception:
+            pass
     return str(val)
 
 
-def log_event(sender: str, recipient: str, message_type: str, payload: Any) -> None:
+def log_event(sender: str, recipient: str, message_type: str, payload: Any = None) -> None:
     """Record a structured, human-readable message exchange in the log."""
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     serializable_payload = to_serializable(payload)
@@ -127,7 +154,7 @@ def log_event(sender: str, recipient: str, message_type: str, payload: Any) -> N
 def log_prompt(user_query: str) -> None:
     """Record the prompt start line required by specification."""
     logger.info("=== PROMPT ===")
-    log_event("user", "agent", "prompt", {"query": user_query})
+    log_event("user", "agent", "prompt_request", {"prompt": user_query})
 
 
 # -----------------------------------------------------------------------------
@@ -139,11 +166,11 @@ PRIVATE_HOUSE_DATA = {
 }
 
 
-def get_private_house_information(question: str) -> dict[str, str]:
+def get_private_house_information(question: str = "", **kwargs: Any) -> dict[str, str]:
     """Retrieve private information regarding the user's house (color or city)."""
-    q = question.lower()
-    has_color = any(word in q for word in ("color", "colour", "paint"))
-    has_city = any(word in q for word in ("city", "location", "located", "where", "town"))
+    full_text = f"{question} {' '.join(str(v) for v in kwargs.values())}".lower()
+    has_color = any(word in full_text for word in ("color", "colour", "paint", "blue"))
+    has_city = any(word in full_text for word in ("city", "location", "located", "where", "town", "san jose"))
 
     if has_color and has_city:
         return {
@@ -166,10 +193,12 @@ def get_private_house_information(question: str) -> dict[str, str]:
         }
 
     return {
+        "house_color": PRIVATE_HOUSE_DATA["house_color"],
+        "house_city": PRIVATE_HOUSE_DATA["house_city"],
         "answer": (
-            "I can provide private information only about the house color (blue) "
-            "or the city where the house is located (San Jose)."
-        )
+            f"The user's house color is {PRIVATE_HOUSE_DATA['house_color']} and "
+            f"the city where the house is located is {PRIVATE_HOUSE_DATA['house_city']}."
+        ),
     }
 
 
@@ -252,17 +281,18 @@ def run_agent_turn(client: genai.Client, user_query: str, model_name: str) -> st
 
     max_tool_iterations = 5
     for iteration in range(max_tool_iterations):
+        # Actual request payload passed to client.models.generate_content
+        request_payload = {
+            "iteration": iteration + 1,
+            "model": model_name,
+            "contents": to_serializable(contents),
+            "config": to_serializable(config),
+        }
         log_event(
             sender="agent",
             recipient="llm",
             message_type="generate_content_request",
-            payload={
-                "iteration": iteration + 1,
-                "model": model_name,
-                "system_instruction": system_instruction,
-                "tools": describe_tools(HOUSE_TOOL_DECLARATION),
-                "contents": to_serializable(contents),
-            },
+            payload=request_payload,
         )
 
         response = client.models.generate_content(
@@ -274,17 +304,16 @@ def run_agent_turn(client: genai.Client, user_query: str, model_name: str) -> st
         function_calls = response.function_calls or []
         resp_text = extract_response_text(response)
 
+        # Actual response payload received from LLM
+        response_payload = to_serializable(response)
+        if isinstance(response_payload, dict):
+            response_payload["iteration"] = iteration + 1
+
         log_event(
             sender="llm",
             recipient="agent",
             message_type="generate_content_response",
-            payload={
-                "iteration": iteration + 1,
-                "text": resp_text,
-                "function_calls": [
-                    {"name": fc.name, "args": fc.args} for fc in function_calls
-                ],
-            },
+            payload=response_payload,
         )
 
         # If no tool calls requested, we have the final answer
@@ -300,23 +329,33 @@ def run_agent_turn(client: genai.Client, user_query: str, model_name: str) -> st
         for fc in function_calls:
             func_name = fc.name
             func_args = fc.args or {}
+
+            # Actual tool request payload passed to tool
+            tool_request_payload = {
+                "function": func_name,
+                "arguments": func_args,
+            }
             log_event(
                 sender="agent",
                 recipient=f"tool:{func_name}",
-                message_type="tool_call",
-                payload={"arguments": func_args},
+                message_type="tool_request",
+                payload=tool_request_payload,
             )
 
-            if func_name in TOOL_MAP:
-                tool_result = TOOL_MAP[func_name](**func_args)
-            else:
-                tool_result = {"error": f"Tool '{func_name}' is not recognized."}
+            try:
+                if func_name in TOOL_MAP:
+                    tool_result = TOOL_MAP[func_name](**func_args)
+                else:
+                    tool_result = {"error": f"Tool '{func_name}' is not recognized."}
+            except Exception as exc:
+                tool_result = {"error": f"Tool execution failed: {exc}"}
 
+            # Actual tool response payload returned by tool
             log_event(
                 sender=f"tool:{func_name}",
                 recipient="agent",
                 message_type="tool_response",
-                payload={"result": tool_result},
+                payload=to_serializable(tool_result),
             )
 
             tool_response_parts.append(

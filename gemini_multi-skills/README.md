@@ -31,11 +31,16 @@ The application features two modular skills adhering to the Gemini skill structu
 - Handles general knowledge inquiries and generates thoughtful, tailored recommendations (e.g. books, podcasts, movies, programming tools) without requiring tool calls.
 
 ### 4. Human-Readable Security-Masked Logging (`logging.py`)
-- Logs all interactions to `multi-skill_agent.log`.
-- Proxies standard library `logging` symbols so third-party dependencies operate without import collisions.
-- Prepends `"=== PROMPT ==="` before each user input in the log.
-- Records structured message boundaries: `USER -> AGENT`, `AGENT -> LLM`, `AGENT -> TOOL`, `TOOL -> AGENT`, `LLM -> AGENT`, and `AGENT -> USER`.
-- Uses `ApiKeyMaskingFilter` to redact all API keys (`[REDACTED_API_KEY]`).
+- Implemented in `logging.py` and called from the main program (`skill_agent_call.py`).
+- Marks each prompt with `"=== PROMPT ==="` before processing.
+- Logs the actual request and response payloads passed between agent, LLM, tools, and skills:
+  - `AGENT -> LLM (GENERATE_CONTENT_REQUEST)`: Full request payload (model, conversation contents, tool declarations).
+  - `LLM -> AGENT (GENERATE_CONTENT_RESPONSE)`: Full response payload (parts, function calls, finish reasons, token usage).
+  - `AGENT -> TOOL (TOOL_REQUEST)`: Tool invocation with input argument payload.
+  - `TOOL -> AGENT (TOOL_RESPONSE)`: Complete tool output and observation payload.
+  - `AGENT -> USER (FINAL_RESPONSE)`: Final formatted response.
+- Uses `ApiKeyMaskingFilter` to redact all API keys (`[REDACTED_API_KEY]`) for security.
+- Human-readable formatted JSON output with ISO timestamps.
 
 ---
 
@@ -45,8 +50,8 @@ The application features two modular skills adhering to the Gemini skill structu
 gemini_multi-skills/
 ├── multi-skill_agent.yaml   # Specification requirements
 ├── README.md                # Documentation and usage guide
-├── logging.py               # Logging module with API key masking & stdlib proxy
-├── skill_agent_call.py      # Main terminal AI agent script
+├── logging.py               # Custom logging module with API key masking & stdlib proxy
+├── skill_agent_call.py      # Main terminal AI agent script calling logging.py
 ├── multi-skill_agent.log    # Interaction log file
 ├── .env                     # Environment variables (API keys and model configs)
 ├── .env.example             # Example environment configuration

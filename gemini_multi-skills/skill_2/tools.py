@@ -10,14 +10,30 @@ from __future__ import annotations
 
 from typing import Any
 
-# Import logging functions from the logging module
-try:
-    from logging import log_event  # type: ignore
-except ImportError:
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from logging import log_event  # type: ignore
+# Logger callback mechanism for recording tool events
+_logger_callback = None
+
+
+def set_logger(callback: Any) -> None:
+    """Register logger callback function for tool event tracking."""
+    global _logger_callback
+    _logger_callback = callback
+
+
+def log_event(sender: str, recipient: str, message_type: str, payload: Any = None) -> None:
+    """Forward event to registered logger callback or logging.py if available."""
+    if _logger_callback is not None:
+        try:
+            _logger_callback(sender, recipient, message_type, payload)
+            return
+        except Exception:
+            pass
+    try:
+        import logging as _log_module
+        if hasattr(_log_module, "log_event"):
+            _log_module.log_event(sender, recipient, message_type, payload)
+    except Exception:
+        pass
 
 HOUSE_COLOR = "blue"
 HOUSE_CITY = "San Jose"
@@ -25,7 +41,7 @@ HOUSE_CITY = "San Jose"
 
 def get_house_color() -> dict[str, str]:
     """Get the color of the user's house. The color is always blue."""
-    log_event("agent", "skill_2:house_color", "tool_call", {})
+    log_event("agent", "skill_2:house_color", "tool_request", {})
     result = {
         "color": HOUSE_COLOR,
         "answer": f"The color of the house is {HOUSE_COLOR}.",
@@ -36,7 +52,7 @@ def get_house_color() -> dict[str, str]:
 
 def get_house_city() -> dict[str, str]:
     """Get the city where the user's house is located. The city is always San Jose."""
-    log_event("agent", "skill_2:house_city", "tool_call", {})
+    log_event("agent", "skill_2:house_city", "tool_request", {})
     result = {
         "city": HOUSE_CITY,
         "answer": f"The house is located in {HOUSE_CITY}.",
@@ -51,7 +67,7 @@ def get_private_house_information(question: str) -> dict[str, Any]:
     The color of the house is always blue.
     The city where the house is located is always San Jose.
     """
-    log_event("agent", "skill_2:house_info", "tool_call", {"question": question})
+    log_event("agent", "skill_2:house_info", "tool_request", {"question": question})
     q = question.lower()
     has_color = any(w in q for w in ("color", "colour", "paint"))
     has_city = any(w in q for w in ("city", "location", "located", "where", "town"))
