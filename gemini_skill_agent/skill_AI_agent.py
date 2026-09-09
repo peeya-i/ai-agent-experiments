@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """Skill AI Agent
 
-Implements a terminal AI agent that accepts natural language input, invokes Google
-Gemini / Gemma models, provides answers and recommendations, follows the procedure
-in `skill.md` for weather and local time lookup for specific cities, and uses a private
-tool to answer questions about the user's house (color: blue, city: San Jose).
-All message interactions between the agent, LLM, tools, and skills are logged
-to `skill_AI_agent.log` with human-readable formatting and API keys masked.
+Implements an interactive terminal AI Agent powered by Google Gemini models.
+Features:
+- Natural language query understanding from terminal input.
+- Answers questions and provides helpful recommendations.
+- Implements and executes the step-by-step procedure defined in `skill.md` for
+  city weather and local time lookup.
+- Tool for 2 private questions about the user's house (color: blue, city: San Jose).
+- Detailed human-readable logging to `skill_AI_agent.log` capturing every request
+  and response payload between Agent, LLM, Tools, and Skills, with strict API key masking
+  and '=== PROMPT ===' line markers.
 """
 
 from __future__ import annotations
 
 import datetime
 import json
-import logging
 import os
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -23,83 +27,59 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 # -----------------------------------------------------------------------------
-# Configuration & Environment
+# Configuration & Paths
 # -----------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-API_KEY = os.getenv("GOOGLE_API_KEY", "")
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
-MODEL_NAME = os.getenv("MODEL", "gemma-4-26b-a4b-it")
-FALLBACK_MODEL_NAME = os.getenv("FALLBACK_MODEL", "gemini-3.5-flash-lite")
+API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "").strip()
+MODEL_NAME = os.getenv("MODEL", "gemini-3.6-flash").strip()
+FALLBACK_MODEL_NAME = os.getenv("FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
 
 SKILL_FILE = BASE_DIR / "skill.md"
 LOG_FILE = BASE_DIR / "skill_AI_agent.log"
-ALT_LOG_FILE = BASE_DIR / "ai_agent.log"
 
 if not API_KEY:
     print("[!] Error: GOOGLE_API_KEY is not set. Please configure it in .env or environment.")
     sys.exit(1)
 
-SKILL_INSTRUCTIONS = (
-    SKILL_FILE.read_text(encoding="utf-8")
-    if SKILL_FILE.exists()
-    else "No skill.md file found."
-)
-
 
 # -----------------------------------------------------------------------------
-# Logging System with API Key Masking
+# Secure Logging System (Human-Readable & API Key Masked)
 # -----------------------------------------------------------------------------
-class ApiKeyMaskingFilter(logging.Filter):
-    """Masks all known API keys in log messages."""
+def mask_sensitive_data(text: str) -> str:
+    """Mask known API keys and common API key patterns."""
+    if not text:
+        return text
 
-    def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        for key in (API_KEY, OPENWEATHER_API_KEY):
-            if key and len(key) > 5:
-                message = message.replace(key, "[REDACTED_API_KEY]")
-        record.msg = message
-        record.args = ()
-        return True
+    # Mask configured API keys
+    for key in (API_KEY, OPENWEATHER_API_KEY):
+        if key and len(key) >= 6:
+            text = text.replace(key, "[REDACTED_API_KEY]")
 
+    # Mask Google API keys (AIza... or AQ....)
+    text = re.sub(r"AIza[0-9A-Za-z\-_]{35}", "[REDACTED_API_KEY]", text)
+    text = re.sub(r"AQ\.[0-9A-Za-z\-_]{30,}", "[REDACTED_API_KEY]", text)
 
-def setup_logger() -> logging.Logger:
-    logger = logging.getLogger("skill_AI_agent")
-    logger.setLevel(logging.INFO)
-    logger.handlers.clear()
+    # Mask query parameters like key=... or appid=...
+    text = re.sub(
+        r"([?&](?:key|appid|apiKey)=)[^&\s'\"`]+",
+        r"\1[REDACTED_API_KEY]",
+        text,
+    )
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    masking_filter = ApiKeyMaskingFilter()
-
-    for path in (LOG_FILE, ALT_LOG_FILE):
-        handler = logging.FileHandler(path, encoding="utf-8")
-        handler.setFormatter(formatter)
-        handler.addFilter(masking_filter)
-        logger.addHandler(handler)
-
-    return logger
-
-
-logger = setup_logger()
-
-
-@dataclass
-class LogEvent:
-    sender: str
-    recipient: str
-    message_type: str
-    payload: Any
-    timestamp: str
+    return text
 
 
 def to_serializable(val: Any) -> Any:
-    """Convert SDK types or objects into clean JSON-serializable dictionaries."""
+    """Recursively convert SDK structures or custom objects into JSON-friendly dicts."""
     if val is None or isinstance(val, (str, int, float, bool)):
         return val
     if hasattr(val, "value") and isinstance(val.value, (str, int, float, bool)):
@@ -121,105 +101,222 @@ def to_serializable(val: Any) -> Any:
     return str(val)
 
 
-def log_event(sender: str, recipient: str, message_type: str, payload: Any) -> None:
-    """Record a structured, human-readable message exchange in the log."""
+def write_raw_log(entry: str) -> None:
+    """Safely append a sanitized string entry to skill_AI_agent.log."""
+    sanitized = mask_sensitive_data(entry)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(sanitized)
+        if not sanitized.endswith("\n"):
+            f.write("\n")
+
+
+def log_prompt_header(user_query: str) -> None:
+    """Log the required '=== PROMPT ===' header and initial user input."""
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    event = LogEvent(
-        sender=sender,
-        recipient=recipient,
-        message_type=message_type,
-        payload=to_serializable(payload),
-        timestamp=now,
+    header = (
+        "\n"
+        "=== PROMPT ===\n"
+        f"{'-' * 80}\n"
+        f"[{now}] USER -> AGENT (PROMPT)\n"
+        f"{json.dumps({'query': user_query}, indent=2, ensure_ascii=False)}\n"
+        f"{'-' * 80}\n"
     )
-    header = f"[{event.timestamp}] {sender.upper()} -> {recipient.upper()} ({message_type.upper()})"
-    body = json.dumps(asdict(event), indent=2, ensure_ascii=False, default=str)
-    logger.info("%s\n%s", header, body)
+    write_raw_log(header)
 
 
-def log_prompt(user_query: str) -> None:
-    """Record the prompt start line required by specification."""
-    logger.info("=== PROMPT ===")
-    log_event("user", "agent", "prompt", {"query": user_query})
+def log_interaction(
+    sender: str,
+    recipient: str,
+    message_type: str,
+    payload: Any,
+) -> None:
+    """Log a human-readable message interaction between Agent, LLM, Tools, Skills, or User."""
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    clean_payload = to_serializable(payload)
+    formatted_body = json.dumps(clean_payload, indent=2, ensure_ascii=False, default=str)
+
+    entry = (
+        f"[{now}] {sender.upper()} -> {recipient.upper()} ({message_type.upper()})\n"
+        f"{formatted_body}\n"
+        f"{'-' * 80}\n"
+    )
+    write_raw_log(entry)
 
 
 # -----------------------------------------------------------------------------
-# Skills & External Service Implementations
+# Skill Management (skill.md)
+# -----------------------------------------------------------------------------
+@dataclass
+class SkillDefinition:
+    name: str
+    description: str
+    procedure: str
+    raw_content: str
+
+
+def load_skill_from_file(file_path: Path = SKILL_FILE) -> SkillDefinition:
+    """Read and parse skill.md following Google Gemini skill structure."""
+    if not file_path.exists():
+        return SkillDefinition(
+            name="city-weather-and-local-time",
+            description="Skill for city weather and local time lookup.",
+            procedure="Use get_weather and get_local_time tools for city inquiries.",
+            raw_content="No skill.md found.",
+        )
+
+    raw_text = file_path.read_text(encoding="utf-8")
+    name = "city-weather-and-local-time"
+    description = "Skill for retrieving weather metrics and local time for cities."
+    procedure = raw_text
+
+    # Parse YAML frontmatter if present
+    if raw_text.startswith("---"):
+        parts = raw_text.split("---", 2)
+        if len(parts) >= 3:
+            try:
+                fm = yaml.safe_load(parts[1]) or {}
+                name = fm.get("name", name)
+                description = fm.get("description", description)
+                procedure = parts[2].strip()
+            except Exception:
+                pass
+
+    return SkillDefinition(
+        name=name,
+        description=description,
+        procedure=procedure,
+        raw_content=raw_text,
+    )
+
+
+# -----------------------------------------------------------------------------
+# Skills & Tools Implementations
 # -----------------------------------------------------------------------------
 CITY_TIMEZONES: dict[str, str] = {
+    # North America
     "san jose": "America/Los_Angeles",
     "san francisco": "America/Los_Angeles",
     "los angeles": "America/Los_Angeles",
     "seattle": "America/Los_Angeles",
-    "new york": "America/New_York",
-    "boston": "America/New_York",
+    "portland": "America/Los_Angeles",
+    "las vegas": "America/Los_Angeles",
+    "phoenix": "America/Phoenix",
+    "denver": "America/Denver",
+    "salt lake city": "America/Denver",
     "chicago": "America/Chicago",
     "austin": "America/Chicago",
-    "denver": "America/Denver",
+    "dallas": "America/Chicago",
+    "houston": "America/Chicago",
+    "new york": "America/New_York",
+    "boston": "America/New_York",
+    "washington": "America/New_York",
+    "washington dc": "America/New_York",
+    "miami": "America/New_York",
+    "atlanta": "America/New_York",
+    "toronto": "America/Toronto",
+    "montreal": "America/Toronto",
+    "vancouver": "America/Vancouver",
+    "mexico city": "America/Mexico_City",
+    # Europe
     "london": "Europe/London",
+    "dublin": "Europe/Dublin",
     "paris": "Europe/Paris",
     "berlin": "Europe/Berlin",
+    "munich": "Europe/Berlin",
+    "frankfurt": "Europe/Berlin",
     "madrid": "Europe/Madrid",
+    "barcelona": "Europe/Madrid",
     "rome": "Europe/Rome",
+    "milan": "Europe/Rome",
     "amsterdam": "Europe/Amsterdam",
+    "brussels": "Europe/Brussels",
+    "vienna": "Europe/Vienna",
+    "zurich": "Europe/Zurich",
+    "geneva": "Europe/Zurich",
+    "stockholm": "Europe/Stockholm",
+    "oslo": "Europe/Oslo",
+    "copenhagen": "Europe/Copenhagen",
+    "helsinki": "Europe/Helsinki",
+    "athens": "Europe/Athens",
+    "istanbul": "Europe/Istanbul",
+    "warsaw": "Europe/Warsaw",
+    "prague": "Europe/Prague",
+    # Asia & Middle East
     "tokyo": "Asia/Tokyo",
     "kyoto": "Asia/Tokyo",
+    "osaka": "Asia/Tokyo",
+    "seoul": "Asia/Seoul",
     "beijing": "Asia/Shanghai",
     "shanghai": "Asia/Shanghai",
+    "shenzhen": "Asia/Shanghai",
     "hong kong": "Asia/Hong_Kong",
+    "taipei": "Asia/Taipei",
     "singapore": "Asia/Singapore",
-    "seoul": "Asia/Seoul",
-    "sydney": "Australia/Sydney",
-    "melbourne": "Australia/Melbourne",
-    "dubai": "Asia/Dubai",
+    "bangkok": "Asia/Bangkok",
+    "kuala lumpur": "Asia/Kuala_Lumpur",
+    "jakarta": "Asia/Jakarta",
+    "manila": "Asia/Manila",
     "mumbai": "Asia/Kolkata",
     "delhi": "Asia/Kolkata",
+    "new delhi": "Asia/Kolkata",
     "bangalore": "Asia/Kolkata",
-    "rio de janeiro": "America/Sao_Paulo",
+    "bengaluru": "Asia/Kolkata",
+    "dubai": "Asia/Dubai",
+    "abu dhabi": "Asia/Dubai",
+    "doha": "Asia/Qatar",
+    "riyadh": "Asia/Riyadh",
+    "tel aviv": "Asia/Jerusalem",
+    # Australia & Oceania
+    "sydney": "Australia/Sydney",
+    "melbourne": "Australia/Melbourne",
+    "brisbane": "Australia/Brisbane",
+    "perth": "Australia/Perth",
+    "auckland": "Pacific/Auckland",
+    # South America & Africa
     "sao paulo": "America/Sao_Paulo",
+    "rio de janeiro": "America/Sao_Paulo",
+    "buenos aires": "America/Argentina/Buenos_Aires",
+    "santiago": "America/Santiago",
     "cairo": "Africa/Cairo",
-    "toronto": "America/Toronto",
-    "vancouver": "America/Vancouver",
+    "johannesburg": "Africa/Johannesburg",
+    "nairobi": "Africa/Nairobi",
 }
 
 
 def get_weather(city: str) -> dict[str, Any]:
-    """Retrieve current weather information for a specified city (via skill.md)."""
+    """Retrieve current weather metrics for a specified city (via skill.md)."""
     clean_city = city.strip()
     encoded_city = urllib.parse.quote(clean_city)
 
-    # 1. Try OpenWeatherMap if an API key is configured
+    # 1. Use OpenWeatherMap if an API key is available
     if OPENWEATHER_API_KEY:
         owm_url = (
             f"https://api.openweathermap.org/data/2.5/weather"
             f"?q={encoded_city}&appid={OPENWEATHER_API_KEY}&units=metric"
         )
-        log_event("skill", "external_service", "openweather_request", {"url": owm_url, "city": clean_city})
         try:
             req = urllib.request.Request(owm_url, headers={"User-Agent": "skill_AI_agent/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            log_event("external_service", "skill", "openweather_response", data)
             return {
                 "city": data.get("name", clean_city),
                 "temperature_c": data.get("main", {}).get("temp"),
                 "feels_like_c": data.get("main", {}).get("feels_like"),
-                "condition": (data.get("weather") or [{}])[0].get("description", "Unknown"),
+                "condition": (data.get("weather") or [{}])[0].get("description", "Clear").title(),
                 "humidity_percent": data.get("main", {}).get("humidity"),
                 "wind_speed": f"{data.get('wind', {}).get('speed', 'N/A')} m/s",
             }
-        except Exception as err:
-            log_event("skill", "agent", "openweather_fallback", {"error": str(err)})
+        except Exception:
+            pass
 
-    # 2. Fallback to wttr.in JSON format (free, no API key required)
+    # 2. Free, reliable fallback via wttr.in JSON format
     wttr_url = f"https://wttr.in/{encoded_city}?format=j1"
-    log_event("skill", "external_service", "wttr_request", {"url": wttr_url, "city": clean_city})
     try:
         req = urllib.request.Request(wttr_url, headers={"User-Agent": "curl/7.68.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        log_event("external_service", "skill", "wttr_response", {"status": "success"})
         curr = data["current_condition"][0]
-        desc = curr.get("weatherDesc", [{}])[0].get("value", "Clear")
+        desc = curr.get("weatherDesc", [{}])[0].get("value", "Clear").strip()
         return {
             "city": clean_city.title(),
             "temperature_c": curr.get("temp_C"),
@@ -229,16 +326,18 @@ def get_weather(city: str) -> dict[str, Any]:
             "wind_speed": f"{curr.get('windspeedKmph')} km/h",
         }
     except Exception as err:
-        log_event("external_service", "skill", "weather_error", {"error": str(err)})
-        return {"error": f"Unable to fetch weather information for '{clean_city}': {err}"}
+        return {
+            "city": clean_city.title(),
+            "error": f"Unable to fetch weather data for '{clean_city}': {err}",
+        }
 
 
 def get_local_time(city: str) -> dict[str, Any]:
-    """Retrieve the current local time and date for a specified city (via skill.md)."""
+    """Retrieve current local time, date, and timezone for a specified city (via skill.md)."""
     clean_city = city.strip().lower()
-    tz_name = CITY_TIMEZONES.get(clean_city)
 
-    # If not in local table, try worldtimeapi.org lookup
+    # Match in local timezone dictionary
+    tz_name = CITY_TIMEZONES.get(clean_city)
     if not tz_name:
         for known_city, known_tz in CITY_TIMEZONES.items():
             if known_city in clean_city or clean_city in known_city:
@@ -249,26 +348,22 @@ def get_local_time(city: str) -> dict[str, Any]:
         try:
             tz = zoneinfo.ZoneInfo(tz_name)
             now = datetime.datetime.now(tz)
-            result = {
+            return {
                 "city": city.strip().title(),
                 "local_time": now.strftime("%I:%M:%S %p"),
                 "local_date": now.strftime("%Y-%m-%d"),
                 "timezone": tz_name,
                 "utc_offset": now.strftime("%z"),
             }
-            log_event("skill", "agent", "local_time_resolved", result)
-            return result
         except Exception as err:
-            log_event("skill", "agent", "timezone_resolution_error", {"error": str(err)})
+            pass
 
-    # Fallback attempt via WorldTimeAPI
-    wta_url = f"https://worldtimeapi.org/api/timezone/{urllib.parse.quote(tz_name or clean_city)}"
-    log_event("skill", "external_service", "worldtime_request", {"url": wta_url})
+    # Fallback to WorldTimeAPI
+    wta_url = f"https://worldtimeapi.org/api/timezone/{urllib.parse.quote(clean_city)}"
     try:
         req = urllib.request.Request(wta_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        log_event("external_service", "skill", "worldtime_response", data)
         return {
             "city": city.strip().title(),
             "local_time": data.get("datetime", "")[11:19],
@@ -276,68 +371,77 @@ def get_local_time(city: str) -> dict[str, Any]:
             "timezone": data.get("timezone"),
             "utc_offset": data.get("utc_offset"),
         }
-    except Exception as err:
-        log_event("external_service", "skill", "time_error", {"error": str(err)})
-        return {"error": f"No timezone information available for city '{city}'."}
+    except Exception:
+        # Ultimate fallback using UTC with notice
+        utc_now = datetime.datetime.now(datetime.timezone.utc)
+        return {
+            "city": city.strip().title(),
+            "local_time": utc_now.strftime("%I:%M:%S %p (UTC)"),
+            "local_date": utc_now.strftime("%Y-%m-%d"),
+            "timezone": "UTC (default fallback)",
+            "utc_offset": "+0000",
+            "note": f"Exact timezone for '{city}' not recognized; returned standard UTC.",
+        }
 
 
 # -----------------------------------------------------------------------------
 # Private House Information Tool
 # -----------------------------------------------------------------------------
-PRIVATE_HOUSE_DATA = {
+USER_HOUSE_DATA = {
     "house_color": "blue",
     "house_city": "San Jose",
 }
 
 
-def get_private_house_information(question: str) -> dict[str, str]:
-    """Retrieve private information regarding the user's house (color or city)."""
-    q = question.lower()
-    has_color = any(w in q for w in ("color", "colour", "paint"))
-    has_city = any(w in q for w in ("city", "location", "located", "where", "town"))
+def get_private_house_information(question: str = "", query_type: str = "all") -> dict[str, Any]:
+    """Retrieve private details about the user's house (color: blue, city: San Jose).
 
-    if has_color and has_city:
+    Args:
+        question: The user's question regarding their house.
+        query_type: Specific attribute requested ('color', 'city', 'location', or 'all').
+    """
+    text = (f"{question} {query_type}").lower()
+    has_color = any(k in text for k in ("color", "colour", "paint"))
+    has_city = any(k in text for k in ("city", "location", "located", "where", "town"))
+
+    if has_color and not has_city:
         return {
-            "house_color": PRIVATE_HOUSE_DATA["house_color"],
-            "house_city": PRIVATE_HOUSE_DATA["house_city"],
-            "answer": (
-                f"The house is {PRIVATE_HOUSE_DATA['house_color']} and is located in "
-                f"{PRIVATE_HOUSE_DATA['house_city']}."
-            ),
+            "house_color": USER_HOUSE_DATA["house_color"],
+            "answer": f"The color of the user's house is {USER_HOUSE_DATA['house_color']}.",
         }
-    if has_color:
+    if has_city and not has_color:
         return {
-            "house_color": PRIVATE_HOUSE_DATA["house_color"],
-            "answer": f"The house color is {PRIVATE_HOUSE_DATA['house_color']}.",
-        }
-    if has_city:
-        return {
-            "house_city": PRIVATE_HOUSE_DATA["house_city"],
-            "answer": f"The house is located in {PRIVATE_HOUSE_DATA['house_city']}.",
+            "house_city": USER_HOUSE_DATA["house_city"],
+            "answer": f"The user's house is located in {USER_HOUSE_DATA['house_city']}.",
         }
 
     return {
+        "house_color": USER_HOUSE_DATA["house_color"],
+        "house_city": USER_HOUSE_DATA["house_city"],
         "answer": (
-            "I can provide private information only about the house color (blue) "
-            "or the city where the house is located (San Jose)."
-        )
+            f"The user's house is {USER_HOUSE_DATA['house_color']} and is located in "
+            f"{USER_HOUSE_DATA['house_city']}."
+        ),
     }
 
 
 # -----------------------------------------------------------------------------
 # Gemini Tool Declarations & Dispatcher
 # -----------------------------------------------------------------------------
-SKILL_TOOLS_DECLARATION = types.Tool(
+AGENT_TOOLS_DECLARATION = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(
             name="get_weather",
-            description="Get current weather metrics for a specified city using the active weather skill.",
+            description=(
+                "Retrieve current weather conditions (temperature, condition, humidity, wind) "
+                "for a specified city following the active skill.md procedure."
+            ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
                     "city": types.Schema(
                         type=types.Type.STRING,
-                        description="The city name to retrieve weather for.",
+                        description="The city name to look up weather for (e.g., 'San Jose', 'Paris').",
                     )
                 },
                 required=["city"],
@@ -345,13 +449,16 @@ SKILL_TOOLS_DECLARATION = types.Tool(
         ),
         types.FunctionDeclaration(
             name="get_local_time",
-            description="Get the current local time and date for a specified city using the active time skill.",
+            description=(
+                "Retrieve the current local time, date, and timezone for a specified city "
+                "following the active skill.md procedure."
+            ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
                     "city": types.Schema(
                         type=types.Type.STRING,
-                        description="The city name to retrieve local time for.",
+                        description="The city name to look up current local time for.",
                     )
                 },
                 required=["city"],
@@ -359,37 +466,59 @@ SKILL_TOOLS_DECLARATION = types.Tool(
         ),
         types.FunctionDeclaration(
             name="get_private_house_information",
-            description="Answer private questions about the user's house (house color: blue, city: San Jose).",
+            description=(
+                "Answer private questions about the user's house: the color of the house "
+                "(which is blue) and the city where the house is located (which is San Jose)."
+            ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
                     "question": types.Schema(
                         type=types.Type.STRING,
-                        description="The user's question regarding their house.",
-                    )
+                        description="The question or attribute regarding the user's house.",
+                    ),
+                    "query_type": types.Schema(
+                        type=types.Type.STRING,
+                        description="Specific attribute requested: 'color', 'city', or 'all'.",
+                    ),
                 },
-                required=["question"],
             ),
         ),
     ]
 )
 
-TOOL_MAP = {
+TOOL_DISPATCHER = {
     "get_weather": get_weather,
     "get_local_time": get_local_time,
     "get_private_house_information": get_private_house_information,
 }
 
 
-def extract_response_text(response: Any) -> str | None:
-    """Extract plain text from candidate response, avoiding SDK warnings on tool calls."""
+def describe_tools(tool_decl: types.Tool) -> list[dict[str, Any]]:
+    """Format tool declarations for human-readable logging."""
+    return [
+        {
+            "name": decl.name,
+            "description": decl.description,
+            "parameters": to_serializable(decl.parameters),
+        }
+        for decl in (tool_decl.function_declarations or [])
+    ]
+
+
+def extract_plain_text(response: Any) -> str | None:
+    """Safely extract plain text from Gemini candidate response parts."""
     try:
         if not response.candidates:
             return None
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
             return None
-        texts = [p.text for p in candidate.content.parts if getattr(p, "text", None) and not getattr(p, "thought", False)]
+        texts = [
+            p.text
+            for p in candidate.content.parts
+            if getattr(p, "text", None) and not getattr(p, "thought", False)
+        ]
         if not texts:
             texts = [p.text for p in candidate.content.parts if getattr(p, "text", None)]
         return "".join(texts).strip() if texts else None
@@ -397,68 +526,96 @@ def extract_response_text(response: Any) -> str | None:
         return None
 
 
-def describe_tools(tool_declaration: types.Tool) -> list[dict[str, Any]]:
-    """Format function declarations for clear human-readable logging."""
-    return [
-        {
-            "name": decl.name,
-            "description": decl.description,
-            "parameters": to_serializable(decl.parameters),
-        }
-        for decl in (tool_declaration.function_declarations or [])
-    ]
-
-
 # -----------------------------------------------------------------------------
-# Agent Turn Execution
+# Agent Turn Execution (Step-by-Step Skill & LLM Orchestration)
 # -----------------------------------------------------------------------------
-def run_agent_turn(client: genai.Client, user_query: str, model_name: str) -> str:
-    """Execute a single agent turn with Gemini, adhering to skill.md instructions."""
+def run_agent_turn(
+    client: genai.Client,
+    user_query: str,
+    active_model: str,
+    skill: SkillDefinition,
+) -> str:
+    """Execute one complete user turn: consult skill, invoke Gemini, dispatch tools, log all steps."""
+
+    # 1. Log Skill invocation / consultation
+    log_interaction(
+        sender="agent",
+        recipient="skill",
+        message_type="consult_skill",
+        payload={
+            "skill_file": str(SKILL_FILE.name),
+            "skill_name": skill.name,
+            "user_query": user_query,
+        },
+    )
+
+    log_interaction(
+        sender="skill",
+        recipient="agent",
+        message_type="skill_procedure_loaded",
+        payload={
+            "skill_name": skill.name,
+            "description": skill.description,
+            "procedure": skill.procedure,
+        },
+    )
+
+    # 2. Build system instructions combining general capability, skill procedure, and private tool
+    system_instruction = (
+        "You are an intelligent, helpful AI Agent. You understand natural language, answer questions, "
+        "and provide insightful recommendations.\n\n"
+        "### Step-by-Step Skill Procedure (from skill.md):\n"
+        f"{skill.procedure}\n\n"
+        "### House Information Tool Rules:\n"
+        "- When the user asks about their house, use the `get_private_house_information` tool.\n"
+        "- The house color is blue.\n"
+        "- The house is located in San Jose.\n\n"
+        "Always be concise, accurate, friendly, and helpful."
+    )
+
     contents: list[types.Content] = [
         types.Content(role="user", parts=[types.Part.from_text(text=user_query)])
     ]
-    system_instruction = (
-        "You are a helpful and intelligent AI assistant. You answer questions and provide recommendations.\n"
-        "You follow the instructions in skill.md to answer questions about weather and local time for any city.\n"
-        "You use the get_private_house_information tool to answer questions about the user's house.\n\n"
-        f"Active Skill Instructions:\n{SKILL_INSTRUCTIONS}"
-    )
+
     config = types.GenerateContentConfig(
-        tools=[SKILL_TOOLS_DECLARATION],
+        tools=[AGENT_TOOLS_DECLARATION],
         system_instruction=system_instruction,
         temperature=0.7,
     )
 
     max_tool_iterations = 6
     for iteration in range(max_tool_iterations):
-        log_event(
+        # Log Agent -> LLM Request
+        log_interaction(
             sender="agent",
             recipient="llm",
             message_type="generate_content_request",
             payload={
                 "iteration": iteration + 1,
-                "model": model_name,
+                "model": active_model,
                 "system_instruction": system_instruction,
-                "tools": describe_tools(SKILL_TOOLS_DECLARATION),
+                "tools": describe_tools(AGENT_TOOLS_DECLARATION),
                 "contents": to_serializable(contents),
             },
         )
 
         response = client.models.generate_content(
-            model=model_name,
+            model=active_model,
             contents=contents,
             config=config,
         )
 
         function_calls = response.function_calls or []
-        resp_text = extract_response_text(response)
+        resp_text = extract_plain_text(response)
 
-        log_event(
+        # Log LLM -> Agent Response
+        log_interaction(
             sender="llm",
             recipient="agent",
             message_type="generate_content_response",
             payload={
                 "iteration": iteration + 1,
+                "model": active_model,
                 "text": resp_text,
                 "function_calls": [
                     {"name": fc.name, "args": fc.args} for fc in function_calls
@@ -466,52 +623,67 @@ def run_agent_turn(client: genai.Client, user_query: str, model_name: str) -> st
             },
         )
 
-        # If no tool calls requested, return final text
+        # If LLM didn't call any tools, we have the final answer
         if not function_calls:
-            final_text = resp_text or "I am sorry, I could not generate a response."
-            return final_text.strip()
+            return resp_text or "I am here to assist you! How can I help?"
 
-        # Add model's intermediate candidate content
+        # Append candidate response to conversation history
         if response.candidates and response.candidates[0].content:
             contents.append(response.candidates[0].content)
 
-        tool_response_parts = []
+        # Dispatch tool calls
+        tool_response_parts: list[types.Part] = []
         for fc in function_calls:
-            func_name = fc.name
-            func_args = fc.args or {}
-            log_event(
-                sender="agent",
-                recipient=f"skill_or_tool:{func_name}",
-                message_type="tool_call",
-                payload={"arguments": func_args},
+            tool_name = fc.name
+            tool_args = fc.args or {}
+
+            # Identify if this is a skill tool or house info tool
+            recipient_entity = f"tool:{tool_name}"
+            if tool_name in ("get_weather", "get_local_time"):
+                sender_entity = "skill"
+            else:
+                sender_entity = "agent"
+
+            # Log Tool Call Request
+            log_interaction(
+                sender=sender_entity,
+                recipient=recipient_entity,
+                message_type="tool_call_request",
+                payload={"arguments": tool_args},
             )
 
-            if func_name in TOOL_MAP:
-                tool_result = TOOL_MAP[func_name](**func_args)
+            # Execute tool
+            if tool_name in TOOL_DISPATCHER:
+                try:
+                    tool_result = TOOL_DISPATCHER[tool_name](**tool_args)
+                except Exception as exc:
+                    tool_result = {"error": f"Tool execution error: {exc}"}
             else:
-                tool_result = {"error": f"Tool '{func_name}' is not recognized."}
+                tool_result = {"error": f"Unrecognized tool: {tool_name}"}
 
-            log_event(
-                sender=f"skill_or_tool:{func_name}",
-                recipient="agent",
-                message_type="tool_response",
+            # Log Tool Response
+            log_interaction(
+                sender=recipient_entity,
+                recipient=sender_entity,
+                message_type="tool_call_response",
                 payload={"result": tool_result},
             )
 
             tool_response_parts.append(
                 types.Part.from_function_response(
-                    name=func_name,
+                    name=tool_name,
                     response=tool_result,
                 )
             )
 
         contents.append(types.Content(role="user", parts=tool_response_parts))
 
-    return "Agent reached maximum tool iterations without producing a final answer."
+    return "Completed maximum tool iterations. Please ask if you need further clarification."
 
 
-def ask_gemini(client: genai.Client, user_query: str) -> str:
-    """Send query to Gemini with fallback model support."""
+def ask_agent(client: genai.Client, user_query: str) -> str:
+    """Send user query to Gemini with automatic model fallback."""
+    skill = load_skill_from_file(SKILL_FILE)
     models_to_try = [MODEL_NAME]
     if FALLBACK_MODEL_NAME and FALLBACK_MODEL_NAME != MODEL_NAME:
         models_to_try.append(FALLBACK_MODEL_NAME)
@@ -519,31 +691,41 @@ def ask_gemini(client: genai.Client, user_query: str) -> str:
     last_error: Exception | None = None
     for model in models_to_try:
         try:
-            return run_agent_turn(client, user_query, model)
+            return run_agent_turn(client, user_query, model, skill)
         except Exception as err:
             last_error = err
-            log_event(
+            log_interaction(
                 sender="agent",
                 recipient="system",
-                message_type="model_error",
-                payload={"model": model, "error": str(err)},
+                message_type="model_fallback_triggered",
+                payload={"failed_model": model, "error": str(err)},
             )
-            print(f"[!] Warning: Model '{model}' failed: {err}. Trying next available model...")
+            print(f"[!] Notice: Model '{model}' error ({err}). Trying fallback...")
 
-    return f"Error communicating with AI models: {last_error}"
+    return f"Unable to complete request across configured models: {last_error}"
 
 
 # -----------------------------------------------------------------------------
-# Main Interaction Loop
+# Terminal Interaction Loop
 # -----------------------------------------------------------------------------
 def main() -> None:
     client = genai.Client(api_key=API_KEY)
-    print("=" * 60)
-    print("        Skill AI Agent (Weather, Time & Gemini)        ")
-    print("=" * 60)
-    print("Ask about weather or local time in any city (e.g. 'Weather in Paris?'),")
-    print("ask general questions/recommendations, or ask about your house.")
-    print("Type 'quit' or 'exit' to end.\n")
+    skill = load_skill_from_file(SKILL_FILE)
+
+    print("=" * 65)
+    print("      Skill AI Agent — Powered by Google Gemini       ")
+    print("=" * 65)
+    print(f"• Active Skill: {skill.name} (from skill.md)")
+    print(f"• Primary Model: {MODEL_NAME} (Fallback: {FALLBACK_MODEL_NAME})")
+    print("• Log File: skill_AI_agent.log")
+    print("-" * 65)
+    print("Capabilities:")
+    print(" 1. Ask about city weather (e.g., 'What is the weather in Tokyo?')")
+    print(" 2. Ask about city local time (e.g., 'What time is it in Paris?')")
+    print(" 3. Ask about both (e.g., 'Give me the weather and time in London')")
+    print(" 4. Ask about your house (color / city location)")
+    print(" 5. Ask general questions or request recommendations")
+    print("Type 'exit' or 'quit' to terminate the session.\n")
 
     while True:
         try:
@@ -559,21 +741,21 @@ def main() -> None:
             print("Goodbye!")
             break
 
-        # Log prompt marker
-        log_prompt(user_input)
+        # Log prompt marker and user input
+        log_prompt_header(user_input)
 
-        # Process through agent
-        response = ask_gemini(client, user_input)
+        # Execute agent workflow
+        response_text = ask_agent(client, user_input)
 
-        # Log agent's final output to user
-        log_event(
+        # Log agent final answer to user
+        log_interaction(
             sender="agent",
             recipient="user",
             message_type="final_response",
-            payload={"response": response},
+            payload={"response": response_text},
         )
 
-        print(f"\nAgent: {response}\n")
+        print(f"\nAgent: {response_text}\n")
 
 
 if __name__ == "__main__":
