@@ -1,0 +1,165 @@
+import os
+import json
+import re
+import logging
+from typing import List, Dict
+
+import requests
+
+# Optional: load environment variables from a .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed – rely on existing environment variables
+    pass
+
+# ---------------------------------------------------------------------------
+# Configuration – loaded from .env (or environment)
+# ---------------------------------------------------------------------------
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-3.5-turbo")
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-3.5-turbo")
+
+if not OPENAI_API_KEY:
+    raise EnvironmentError("OPENAI_API_KEY not set in environment or .env file")
+
+# ---------------------------------------------------------------------------
+# Logging setup – DEBUG level, JSON‑friendly output to a file
+# ---------------------------------------------------------------------------
+logger = logging.getLogger("skill_logger")
+logger.setLevel(logging.DEBUG)
+log_file_path = os.path.join(os.path.dirname(__file__), "skill_real.log")
+file_handler = logging.FileHandler(log_file_path)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# ---------------------------------------------------------------------------
+# Weather tool (no API key required)
+# ---------------------------------------------------------------------------
+def get_weather(city: str) -> str:
+    """Fetch current weather for *city* using the free wttr.in service.
+
+    The service returns JSON when ``?format=j1`` is appended. We extract a
+    concise description (temperature in °C and a short weather text).
+    """
+    try:
+        url = f"https://wttr.in/{city}?format=j1"
+        response = requests.get(url, headers={"User-Agent": "skill_real/1.0"})
+        response.raise_for_status()
+        data = response.json()
+        current = data["current_condition"][0]
+        temp_c = current.get("temp_C", "N/A")
+        desc = current.get("weatherDesc", [{}])[0].get("value", "")
+        return f"{city.title()}: {temp_c}°C, {desc}"
+    except Exception as e:
+        logger.error("Weather lookup failed for %s: %s", city, e)
+        return f"Failed to retrieve weather for {city}."
+
+# ---------------------------------------------------------------------------
+# Tool registry
+# ---------------------------------------------------------------------------
+AVAILABLE_TOOLS = {
+    "get_weather": get_weather,
+}
+
+# ---------------------------------------------------------------------------
+# LLM interaction – real OpenAI call with fallback handling
+# ---------------------------------------------------------------------------
+def real_llm_call(messages: List[Dict[str, str]]) -> Dict:
+    """Call OpenAI ChatCompletion with the primary model, falling back on error.
+
+    Returns the full response dictionary from OpenAI so we can log it.
+    """
+    import openai
+
+    openai.api_key = OPENAI_API_KEY
+    try:
+        logger.debug("LLM request payload: %s", json.dumps(messages))
+        response = openai.ChatCompletion.create(model=MODEL_NAME, messages=messages)
+    except Exception as exc:
+        logger.warning("Primary model %s failed: %s – falling back to %s", MODEL_NAME, exc, FALLBACK_MODEL)
+        response = openai.ChatCompletion.create(model=FALLBACK_MODEL, messages=messages)
+    logger.debug("LLM response payload: %s", json.dumps(response))
+    return response
+
+# ---------------------------------------------------------------------------
+# Skill definition – REACT‑style prompting for weather queries
+# ---------------------------------------------------------------------------
+WEATHER_SKILL = """
+Role: You are a weather‑information assistant.
+Process: Follow this sequential process to answer the user query:
+  1. THOUGHT: Determine what information is missing.
+  2. ACTION: If you need current weather, call the ``get_weather`` tool in JSON format:
+     {"tool": "get_weather", "arg": "<city name>"}
+  3. ANSWER: When you have the weather, provide a concise, friendly answer.
+
+Example Workflow:
+Thought: I need the weather for London.
+Action: {"tool": "get_weather", "arg": "London"}
+Observation: London: 12°C, Light rain.
+Thought: I have the data to answer.
+Answer: The current weather in London is 12°C with Light rain.
+"""
+
+# ---------------------------------------------------------------------------
+# Agent reasoning loop – uses the real LLM and the weather tool
+# ---------------------------------------------------------------------------
+def run_agent_loop(user_query: str) -> None:
+    print(f"🚀 User Query: '{user_query}'\n")
+
+    # Seed the context with the skill definition and the user query
+    agent_context = f"{WEATHER_SKILL}\nUser Query: {user_query}\n"
+
+    # The LLM expects a list of messages – we start with a system‑style message
+    messages = [{"role": "system", "content": agent_context}]
+
+    for step in range(1, 5):  # safety cap of 4 iterations
+        print(f"--- [Loop Iteration {step}] ---")
+
+        llm_response = real_llm_call(messages)
+        # Extract the assistant's reply (assuming the usual OpenAI format)
+        reply = llm_response["choices"][0]["message"]["content"].strip()
+        print(reply)
+
+        # Append assistant's reply to the message history for the next turn
+        messages.append({"role": "assistant", "content": reply})
+
+        # Check for final answer
+        if "Answer:" in reply:
+            print("\n✅ Task completed successfully!")
+            break
+
+        # Look for an Action JSON block
+        action_match = re.search(r"Action:\s*(\{.*\})", reply)
+        if action_match:
+            try:
+                tool_call = json.loads(action_match.group(1))
+                tool_name = tool_call["tool"]
+                tool_arg = tool_call["arg"]
+                if tool_name in AVAILABLE_TOOLS:
+                    observation = AVAILABLE_TOOLS[tool_name](tool_arg)
+                    print(f"🔍 [Tool Output/Observation]: {observation}")
+                    # Feed observation back into context for the next LLM turn
+                    observation_msg = f"Observation: {observation}"
+                    messages.append({"role": "assistant", "content": observation_msg})
+                else:
+                    obs = f"Tool '{tool_name}' is not available."
+                    print(f"🔍 [Tool Output/Observation]: {obs}")
+                    messages.append({"role": "assistant", "content": f"Observation: {obs}"})
+            except Exception as e:
+                error_msg = f"Failed to parse action JSON. Error: {e}"
+                logger.error(error_msg)
+                messages.append({"role": "assistant", "content": f"Observation: {error_msg}"})
+        else:
+            # No action detected – assume the LLM is done or needs clarification.
+            print("\n⚠️ No Action found; ending loop.")
+            break
+
+# ---------------------------------------------------------------------------
+# Example execution (remove or comment out when importing as a module)
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    # Simple demo – replace with any city you like
+    run_agent_loop("What is the weather in London?")
