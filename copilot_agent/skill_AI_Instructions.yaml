@@ -12,7 +12,8 @@ Create a simple python code called skill_AI_agent.py that does the following:
     - The color of the house which is blue
     - The city where the house is located which is San Jose
   - Create a file called skill_AI_agent.log to log all the messages pass between AI Agent, LLM, tools, and skills:
-    - Include all the actual messages and details of the messages in the log file.
+    - Include the actual requests and responses payload passed between agent, LLM, tools, and skills.
     - Mask the API key in the log file for security purposes.
     - Structure the log so it can be easily viewed by humans.
     - Add a line with "=== PROMPT ===" to the log file to mark each prompt
+Create the README_SKILL.md file to show how to use the code and what it does.
