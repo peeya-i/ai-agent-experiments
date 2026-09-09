@@ -12,3 +12,4 @@ Create a simple python code called simple_AI_agent.py that does the following:
     - Mask the API key in the log file for security purposes.
     - Structure the log so it can be easily viewed by humans.
     - Add a line with "=== PROMPT ===" to the log file to mark each prompt
+Create the README.md file to show how to use the code and what it does.

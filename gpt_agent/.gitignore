@@ -1,5 +1,6 @@
-node_modules/
+.venv
 .env
-server/.repos/
-dist/
-client/node_modules/
+__pycache__
+
+simple_AI_agent.log
+skill_AI_agent.log
