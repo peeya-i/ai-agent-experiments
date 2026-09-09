@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WanderAI — Autonomous Multi-Agent Travel Itinerary Builder</title>
+  <meta name="description" content="Autonomous multi-agent travel planner leveraging Gemini API with parallel discovery, iterative budget optimization, and comprehensive execution event tracking.">
+  
+  <!-- Modern Typography from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- App Header & Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-badge">AI AGENTS</div>
+        <h1 class="brand-title">Wander<span>AI</span></h1>
+        <p class="brand-subtitle">Autonomous Travel Pipeline</p>
+      </div>
+
+      <!-- Top Navigation Tabs (Requirement 6) -->
+      <nav class="nav-tabs" role="tablist">
+        <button id="tab-btn-generator" class="tab-btn active" role="tab" aria-selected="true" aria-controls="view-generator">
+          <span class="tab-icon">✈️</span>
+          <span>Itinerary Builder</span>
+        </button>
+        <button id="tab-btn-logs" class="tab-btn" role="tab" aria-selected="false" aria-controls="view-logs">
+          <span class="tab-icon">📊</span>
+          <span>Itineraries & Event Logs</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-container">
+
+    <!-- ============================================================= -->
+    <!-- TAB 1: ITINERARY BUILDER & LIVE VIEWER                        -->
+    <!-- ============================================================= -->
+    <section id="view-generator" class="tab-pane active" role="tabpanel">
+      <div class="generator-grid">
+        
+        <!-- Left: Input Form Card -->
+        <div class="card form-card">
+          <div class="card-header">
+            <h2>Plan Your Vacation</h2>
+            <p>Define your destination, budget, and travel preferences.</p>
+          </div>
+
+          <form id="itinerary-form" class="form-layout">
+            <div class="form-group">
+              <label for="input-origin">City of Origin</label>
+              <input type="text" id="input-origin" name="origin" placeholder="e.g. San Francisco, USA" required value="San Francisco, USA">
+            </div>
+
+            <div class="form-group">
+              <label for="input-destination">Destination City</label>
+              <input type="text" id="input-destination" name="destination" placeholder="e.g. Kyoto, Japan" required value="Kyoto, Japan">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="input-duration">Duration (Days)</label>
+                <input type="number" id="input-duration" name="duration" min="1" max="14" value="3" required>
+              </div>
+
+              <div class="form-group col">
+                <label for="input-budget">Total Budget ($ USD)</label>
+                <input type="number" id="input-budget" name="budget" min="50" step="10" value="1200" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="input-departure">Departure Date <span class="badge-opt">Optional</span></label>
+              <input type="date" id="input-departure" name="departure_date">
+            </div>
+
+            <div class="form-group">
+              <label for="input-interests">Interests & Vibes</label>
+              <input type="text" id="input-interests" name="interests" placeholder="e.g. Historic Temples, Matcha & Ramen, Bamboo Groves, Art" value="Temples, Ramen & Tea, Gardens, Traditional Crafts">
+              <small class="field-hint">Comma-separated interests used to match activities & neighborhoods.</small>
+            </div>
+
+            <button type="submit" id="btn-submit-generate" class="btn btn-primary btn-block">
+              <span class="btn-icon">⚡</span>
+              <span class="btn-text">Generate Autonomous Itinerary</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Real-Time Results & Pipeline Status Area -->
+        <div class="card result-card">
+          
+          <!-- State 1: Idle Placeholder -->
+          <div id="result-placeholder" class="placeholder-box">
+            <div class="placeholder-icon">🗺️</div>
+            <h3>Your Personalized Plan Awaits</h3>
+            <p>Our autonomous agents (FlightResearcher, HotelResearcher, ActivityPlanner, and Loop Optimizer) will coordinate to craft your trip within budget.</p>
+          </div>
+
+          <!-- State 2: Active Generating Animation -->
+          <div id="result-loading" class="loading-box hidden">
+            <div class="pulse-loader">
+              <div class="pulse-ring"></div>
+              <div class="pulse-icon">🤖</div>
+            </div>
+            <h3 id="pipeline-status-text">Pipeline in Progress...</h3>
+            <div class="agent-stepper">
+              <div class="step-item active" id="step-parallel">
+                <span class="step-dot"></span>
+                <span>Parallel Discovery (Flights, Hotels, Sights)</span>
+              </div>
+              <div class="step-item" id="step-scheduler">
+                <span class="step-dot"></span>
+                <span>Geographic Clustering & Skills Enrichment</span>
+              </div>
+              <div class="step-item" id="step-budget">
+                <span class="step-dot"></span>
+                <span>Loop Optimization & Budget Enforcement</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- State 3: Rendered Generated Itinerary -->
+          <div id="result-content" class="content-box hidden">
+            
+            <div class="result-top-bar">
+              <div>
+                <span id="itinerary-status-badge" class="badge badge-success">Budget Approved</span>
+                <h3 id="itinerary-title" class="result-destination-title">Kyoto, Japan</h3>
+                <p id="itinerary-meta" class="result-destination-meta">From San Francisco | 3 Days</p>
+              </div>
+
+              <!-- Export Buttons (Requirement 5) -->
+              <div class="export-actions">
+                <a id="btn-download-txt" href="#" class="btn btn-secondary btn-sm" download>
+                  <span>📄 Download TXT</span>
+                </a>
+                <a id="btn-download-pdf" href="#" class="btn btn-primary btn-sm" download>
+                  <span>📑 Download PDF</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Financial Summary Strip -->
+            <div class="financial-summary-strip">
+              <div class="stat-cell">
+                <span class="stat-lbl">Target Budget</span>
+                <span id="stat-target-budget" class="stat-val">$1,200.00</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-lbl">Estimated Total</span>
+                <span id="stat-est-cost" class="stat-val highlight">$1,120.00</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-lbl">Transit</span>
+                <span id="stat-flight-cost" class="stat-val">$320.00</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-lbl">Lodging</span>
+                <span id="stat-hotel-cost" class="stat-val">$420.00</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-lbl">Activities</span>
+                <span id="stat-act-cost" class="stat-val">$180.00</span>
+              </div>
+            </div>
+
+            <!-- Lodging & Flight Overview -->
+            <div class="logistics-grid">
+              <div class="logistics-item">
+                <div class="logistics-badge">✈️ Transport</div>
+                <div id="logistics-flight-desc" class="logistics-info">SkyWings Express (Direct) • $320.00</div>
+              </div>
+              <div class="logistics-item">
+                <div class="logistics-badge">🏨 Lodging</div>
+                <div id="logistics-hotel-desc" class="logistics-info">Central Grand Hotel in Downtown • $140/night</div>
+              </div>
+            </div>
+
+            <!-- Critic Feedback Box (if any) -->
+            <div id="critic-feedback-banner" class="critic-banner hidden">
+              <span class="critic-icon">💡</span>
+              <div class="critic-body">
+                <strong>Optimization Notes:</strong>
+                <span id="critic-feedback-text"></span>
+              </div>
+            </div>
+
+            <!-- Day-by-Day Geographically Grouped Timeline -->
+            <div class="schedule-section">
+              <h4>Day-by-Day Geographically Clustered Schedule</h4>
+              <div id="schedule-days-container" class="days-container">
+                <!-- Day cards rendered dynamically via JS -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TAB 2: ITINERARIES & EVENT LOGS DASHBOARD                     -->
+    <!-- ============================================================= -->
+    <section id="view-logs" class="tab-pane" role="tabpanel">
+      
+      <!-- Summary Metric Cards (Requirement: Summary of itineraries requested, generated, failed, and events logged) -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon icon-blue">📋</div>
+          <div class="metric-info">
+            <span class="metric-num" id="metric-total-itineraries">0</span>
+            <span class="metric-label">Itineraries Requested</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon icon-green">✅</div>
+          <div class="metric-info">
+            <span class="metric-num" id="metric-successful-runs">0</span>
+            <span class="metric-label">Itineraries Generated</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon icon-amber">⚠️</div>
+          <div class="metric-info">
+            <span class="metric-num" id="metric-failed-runs">0</span>
+            <span class="metric-label">Failed Requests</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon icon-purple">⚡</div>
+          <div class="metric-info">
+            <span class="metric-num" id="metric-total-events">0</span>
+            <span class="metric-label">Events Logged</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table 1: Itineraries Requested (Requirement: Created At, Travel Date, Duration, Destination, Origin, Budget, Est Cost, Status, Event Logs) -->
+      <div class="table-card">
+        <div class="table-card-header">
+          <div>
+            <h3>Itineraries Requested</h3>
+            <p class="section-desc">Click any row to view its full itinerary in a popup. Click the <strong>Events Count</strong> to view all event logs for that run in the table below.</p>
+          </div>
+          <button id="btn-refresh-history" class="btn btn-secondary btn-sm">
+            <span>🔄 Refresh History</span>
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table" id="table-itineraries">
+            <thead>
+              <tr>
+                <th>Created At</th>
+                <th>Travel Date</th>
+                <th>Duration</th>
+                <th>Destination</th>
+                <th>City of Origin</th>
+                <th>Budget</th>
+                <th>Estimated Cost</th>
+                <th>Status</th>
+                <th>Event Logs</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-itineraries">
+              <tr>
+                <td colspan="9" class="text-center empty-cell">Loading run history...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Table 2: Event Logs for Selected Run (Requirement: Timestamp, Event Type, Agent/Source, Summary, Payload Button) -->
+      <div class="table-card" id="card-events-section">
+        <div class="table-card-header">
+          <div>
+            <h3 id="events-table-title">Execution Event Logs</h3>
+            <p class="section-desc" id="events-table-subtitle">Select an itinerary above or click its event count to display its event logs.</p>
+          </div>
+          <span id="selected-run-badge" class="badge badge-neutral">No Run Selected</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table" id="table-events">
+            <thead>
+              <tr>
+                <th style="width: 170px;">Timestamp</th>
+                <th style="width: 140px;">Event Type</th>
+                <th style="width: 160px;">Agent / Source</th>
+                <th>Summary</th>
+                <th style="width: 110px; text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-events">
+              <tr>
+                <td colspan="5" class="text-center empty-cell">Click an event count in the table above to view events for that run.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ============================================================= -->
+  <!-- MODAL 1: FULL ITINERARY POPUP WINDOW (Requirement)             -->
+  <!-- ============================================================= -->
+  <div id="modal-itinerary" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-itinerary-title">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 id="modal-itinerary-title">Full Itinerary Details</h3>
+        <button class="btn-close-modal" id="btn-close-itinerary-modal" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-itinerary-body">
+        <!-- Injected dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-dismiss-itinerary-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL 2: EVENT PAYLOAD POPUP & COPY (Requirement)              -->
+  <!-- Displays all information stored in the event with copy button  -->
+  <!-- ============================================================= -->
+  <div id="modal-payload" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-payload-title">
+    <div class="modal-container modal-payload-dialog">
+      <div class="modal-header">
+        <div class="modal-header-text">
+          <h3 id="modal-payload-title">Event Details & Payload</h3>
+          <span id="modal-payload-source" class="badge badge-accent">Agent</span>
+        </div>
+        <button class="btn-close-modal" id="btn-close-payload-modal" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="payload-meta-strip">
+          <span id="modal-payload-id" class="meta-tag">Event ID</span>
+          <span id="modal-payload-run" class="meta-tag">Run ID</span>
+          <span id="modal-payload-type" class="meta-tag">Event Type</span>
+          <span id="modal-payload-time" class="meta-tag">Timestamp</span>
+        </div>
+        <div class="event-summary-box" style="margin-bottom: 1rem; background: rgba(255,255,255,0.03); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+          <strong style="color: var(--text-primary); font-size: 0.85rem;">Summary:</strong>
+          <span id="modal-payload-summary" class="payload-summary-text" style="color: var(--text-secondary); margin-left: 0.5rem; font-size: 0.88rem;"></span>
+        </div>
+        
+        <div class="code-container">
+          <div class="code-header">
+            <span>Event Payload Data (All Fields)</span>
+            <!-- Clipboard Copy Button (Requirement) -->
+            <button id="btn-copy-payload" class="btn btn-copy">
+              <span id="copy-icon">📋</span>
+              <span id="copy-text">Copy to Clipboard</span>
+            </button>
+          </div>
+          <pre id="modal-payload-code" class="code-block"><code></code></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-dismiss-payload-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast-notification hidden"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
