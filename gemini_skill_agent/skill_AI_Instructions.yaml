@@ -1,5 +1,5 @@
 # Skill AI Agent
-Create a skill called skill.md based on the structure used by Google Gemini model
+Create a skill called skill.md based on the structure used by Google Gemini model:
   - The skill will help the AI Agent when the user ask the question about the weather in a specific city and the local time in that city.
   - The skill will the current weather information for the specified city and will get the local time in that city.
 Create a simple python code called skill_AI_agent.py that does the following:
