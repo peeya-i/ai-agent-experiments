@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any, List
 from pipeline.gemini_service import GeminiService
 from pipeline.skills import LocalVibeSkill, HiddenGemSkill
+from pipeline.tools import GeoClusteringTool, BudgetCalculatorTool
 from services.tracker import Tracker
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,8 @@ class Scheduler:
         self.name = "Scheduler"
         self.local_vibe_skill = LocalVibeSkill(gemini, run_id)
         self.hidden_gem_skill = HiddenGemSkill(gemini, run_id)
+        self.geo_tool = GeoClusteringTool(run_id)
+        self.calculator_tool = BudgetCalculatorTool(run_id)
 
     def execute(self, state: Dict[str, Any], iteration: int) -> Dict[str, Any]:
         user_input = state["user_input"]
@@ -46,20 +49,16 @@ class Scheduler:
         # 3. Filter / Adjust activities based on iteration & feedback
         active_activities = self._filter_activities(activities, iteration, critic_feedback)
 
-        # 4. Group activities geographically by day
-        schedule = self._build_geographic_schedule(active_activities, days, destination, interests, iteration)
+        # 4. Group activities geographically by day using GeoClusteringTool
+        cluster_data = self.geo_tool.execute(active_activities, days, destination)
+        base_schedule = cluster_data.get("daily_clusters", [])
 
-        # 5. Calculate Total Costs
-        flight_cost = float(selected_flight.get("estimated_cost", 0.0))
-        hotel_nightly = float(selected_hotel.get("nightly_rate", 0.0))
-        hotel_total = hotel_nightly * days
+        # 5. Enrich daily schedule with Gemini skills
+        schedule = self._enrich_schedule_with_skills(base_schedule, days, destination, interests)
 
-        activities_total = 0.0
-        for day in schedule:
-            for ev in day.get("events", []):
-                activities_total += float(ev.get("estimated_cost", 0.0))
-
-        total_cost = round(flight_cost + hotel_total + activities_total, 2)
+        # 6. Calculate Total Costs using BudgetCalculatorTool
+        cost_breakdown = self.calculator_tool.execute(selected_flight, selected_hotel, days, schedule)
+        total_cost = cost_breakdown["total_estimated_cost"]
 
         # Update state current_itinerary
         state["current_itinerary"] = {
@@ -69,9 +68,9 @@ class Scheduler:
             "selected_hotel": selected_hotel,
             "total_estimated_cost": total_cost,
             "cost_breakdown": {
-                "flight": flight_cost,
-                "lodging": hotel_total,
-                "activities": round(activities_total, 2)
+                "flight": cost_breakdown["flight"],
+                "lodging": cost_breakdown["lodging"],
+                "activities": cost_breakdown["activities"]
             },
             "schedule": schedule,
             "iteration": iteration
@@ -132,68 +131,45 @@ class Scheduler:
             return sorted_act
         return activities
 
-    def _build_geographic_schedule(
+    def _enrich_schedule_with_skills(
         self,
-        activities: List[Dict[str, Any]],
+        base_schedule: List[Dict[str, Any]],
         days: int,
         destination: str,
-        interests: List[str],
-        iteration: int
+        interests: List[str]
     ) -> List[Dict[str, Any]]:
-        # 1. Group activities by neighborhood
-        neighborhood_groups: Dict[str, List[Dict[str, Any]]] = {}
-        for act in activities:
-            nb = act.get("neighborhood", "Downtown / City Center")
-            if nb not in neighborhood_groups:
-                neighborhood_groups[nb] = []
-            neighborhood_groups[nb].append(act)
-
-        sorted_neighborhoods = sorted(neighborhood_groups.keys(), key=lambda k: len(neighborhood_groups[k]), reverse=True)
-        schedule = []
-
         # Get a hidden gem via skill
         hidden_gem = self.hidden_gem_skill.execute(destination, interests)
+        schedule = []
 
-        for d in range(1, days + 1):
-            day_nb = sorted_neighborhoods[(d - 1) % len(sorted_neighborhoods)] if sorted_neighborhoods else "Central District"
-            day_pool = neighborhood_groups.get(day_nb, [])
-
-            # Take 2-3 activities in this geographic neighborhood
-            day_events = []
-            if day_pool:
-                events_to_take = day_pool[:3]
-            else:
-                events_to_take = [
-                    {"name": f"{day_nb} Walking Exploration", "neighborhood": day_nb, "category": "Sightseeing", "estimated_cost": 0.0, "duration_hours": 2.0},
-                    {"name": f"{day_nb} Local Cafe & Plaza", "neighborhood": day_nb, "category": "Food & Dining", "estimated_cost": 15.0, "duration_hours": 1.5}
-                ]
-
-            # Assign time slots (Morning, Afternoon, Evening)
-            time_slots = ["Morning (09:30 AM)", "Afternoon (02:00 PM)", "Evening (06:30 PM)"]
-            for idx, ev in enumerate(events_to_take):
-                slot = time_slots[idx % len(time_slots)]
-                event_item = dict(ev)
-                event_item["time_slot"] = slot
-                day_events.append(event_item)
+        for day_cluster in base_schedule:
+            d = day_cluster.get("day", 1)
+            day_nb = day_cluster.get("neighborhood_focus", "Central District")
+            day_events = list(day_cluster.get("events", []))
 
             # Add hidden gem on Day 2 (or Day 1 if 1-day trip)
             if (d == 2 or (days == 1 and d == 1)) and hidden_gem:
                 gem_event = {
                     "name": f"✨ Hidden Gem: {hidden_gem.get('title', 'Secret Spot')}",
                     "neighborhood": hidden_gem.get("neighborhood", day_nb),
+                    "location": f"{hidden_gem.get('neighborhood', day_nb)}, {destination}",
                     "category": "Hidden Gem",
                     "estimated_cost": float(hidden_gem.get("estimated_cost", 0.0)),
                     "duration_hours": 1.5,
                     "description": hidden_gem.get("description", "Curated local discovery."),
-                    "time_slot": "Late Afternoon (04:30 PM)"
+                    "time_slot": "Late Afternoon (05:00 PM - 06:30 PM)"
                 }
                 day_events.append(gem_event)
 
             # Local vibe skill tip
             insider_tip = self.local_vibe_skill.execute(destination, day_nb, d)
 
+            # Calculate total cost for the day
+            day_cost = round(sum(float(e.get("estimated_cost", 0.0)) for e in day_events), 2)
+
             schedule.append({
                 "day": d,
+                "estimated_cost": day_cost,
                 "neighborhood_focus": day_nb,
                 "insider_tip": insider_tip,
                 "events": day_events

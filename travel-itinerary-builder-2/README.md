@@ -42,7 +42,7 @@ The system implements a **Sequential Pipeline** coordinating a **Parallel Discov
 |  - artifacts/usages.csv : Request summary, costs, status, event count   |
 |  - artifacts/events.json: Single-line log per record of invocations,    |
 |                           requests, and responses of agents, skills,    |
-|                           and models with actual sent/received payloads |
+|                           tools, and models with full payloads          |
 +------------------------------------+------------------------------------+
                                      |
                                      v
@@ -62,18 +62,27 @@ The system implements a **Sequential Pipeline** coordinating a **Parallel Discov
 
 ### 2. Iterative Refinement Phase (`LoopAgent`)
 - `Scheduler`:
-  - Groups daily activities by neighborhood to prevent back-and-forth travel time.
+  - Utilizes `GeoClusteringTool` to group activities and dining by neighborhood, eliminating back-and-forth transit time.
+  - Formats each day in a clearly separated, day-by-day structure with:
+    - Day number and neighborhood focus.
+    - **Estimated cost for each day** (`estimated_cost`).
+    - **Suggested dining for all meals**: Breakfast (`🍳`), Lunch (`🥗`), and Dinner (`🍽️`).
+    - **Activity Details**: Time slot, Name of activity, Estimated cost, Duration (`⏱️`), Location (`📍`), and Description.
   - Implements **Gemini Skills**:
     - `LocalVibeSkill`: Injects authentic insider tips and cultural customs for each day's neighborhood focus.
     - `HiddenGemSkill`: Recommends unexpected, charming off-the-beaten-path mini stops.
   - Reads `critic_feedback` from prior iterations to downgrade lodging tiers, select budget transit, and substitute free walking sights.
 - `BudgetEnforcer`:
-  - Validates total trip cost against the user's budget.
+  - Utilizes `BudgetCalculatorTool` to compute total trip costs (transit + lodging + activities + dining).
   - Sets `budget_approved = True` if cost is within budget.
   - Otherwise generates detailed `critic_feedback` and triggers the next iteration (up to 3 loops).
 - **Graceful Failure Handling**: If an impossible budget is provided (e.g., $10 for 5 days in Tokyo), the agent selects the lowest possible budget options and issues a clear budget warning banner without crashing.
 
-### 3. Global State Schema
+### 3. Tools Layer (`pipeline/tools.py`)
+- `GeoClusteringTool`: Organizes activities by geographic proximity and builds a structured day schedule (Breakfast $\rightarrow$ Morning Sight $\rightarrow$ Lunch $\rightarrow$ Afternoon Exploration $\rightarrow$ Dinner).
+- `BudgetCalculatorTool`: Computes accurate cost breakdowns across lodging, transit, and daily dining/activities.
+
+### 4. Global State Schema
 All agents interact with a single, centralized dictionary state:
 ```json
 {
@@ -92,12 +101,30 @@ All agents interact with a single, centralized dictionary state:
   },
   "current_itinerary": {
     "total_estimated_cost": 0.0,
+    "cost_breakdown": {
+      "flight": 0.0,
+      "lodging": 0.0,
+      "activities": 0.0
+    },
+    "selected_flight": {},
+    "selected_hotel": {},
     "schedule": [
       {
         "day": 1,
+        "estimated_cost": 0.0,
         "neighborhood_focus": "string",
         "insider_tip": "string",
-        "events": []
+        "events": [
+          {
+            "name": "string",
+            "time_slot": "string",
+            "category": "Breakfast | Lunch | Dinner | Sight | Hidden Gem",
+            "location": "string",
+            "duration_hours": 1.0,
+            "estimated_cost": 0.0,
+            "description": "string"
+          }
+        ]
       }
     ]
   },
@@ -116,15 +143,16 @@ The Flask application features a dual-tab dashboard:
    - Form inputs for origin, destination, duration, budget, departure date, and interests.
    - Interactive pipeline execution stepper.
    - Financial breakdown strip (Transit, Lodging, Activities, Total Cost vs Target Budget).
-   - Day-by-day cards featuring neighborhood focus tags, insider tips, and hidden gems.
+   - Day-by-day cards featuring neighborhood focus tags, day cost badges, all 3 daily meals, and activity details.
    - **Download Buttons**: Export itinerary as plain text (`.txt`) or styled PDF (`.pdf`).
 
 2. **Tab 2: Itineraries & Event Logs**:
-   - **Metric Cards**: Total itineraries created, successful runs, budget exceeded runs, and total event logs stored.
-   - **Itinerary Runs History Table**: Displays all historical runs from `artifacts/usages.csv`.
-   - **Full Itinerary Popup**: Clicking any row displays the full itinerary in a modal dialog.
-   - **Execution Event Logs Table**: Clicking the event count pill on any row reveals the granular agent/skill events for that specific run in the table below.
-   - **Event Payload Popup**: Clicking "Payload" displays formatted JSON with a **"Copy to Clipboard"** button.
+   - **Metric Cards**: *Itineraries Requested*, *Itineraries Generated*, *Failed Requests*, and *Events Logged*.
+   - **Itineraries Requested Table**: Displays all historical runs from `artifacts/usages.csv` with travel dates, origin, budget, cost, and status.
+   - **Full Itinerary Popup**: Clicking any row displays the full itinerary in a modal dialog matching the Page 1 layout.
+   - **Lifecycle Event Logs Table**: Granular agent, skill, tool, and model lifecycle events recorded on a per-run basis.
+   - **Event Payload Popup**: Clicking "Payload" displays complete event details in formatted JSON with a **"Copy to Clipboard"** button.
+   - **API Key Redaction**: Sensitive API keys and auth tokens are automatically redacted prior to storage in `artifacts/events.json`.
 
 ---
 
@@ -132,12 +160,14 @@ The Flask application features a dual-tab dashboard:
 
 ### 1. Prerequisites
 - Python 3.10+
-- Virtual environment (recommended)
+- Virtual environment
 
-### 2. Install Dependencies
+### 2. Activate Virtual Environment & Install Dependencies
 ```bash
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+*(Or use `.venv/bin/python app.py` directly)*
 
 ### 3. Configure Environment Variables
 Copy `.env.example` to `.env`:
@@ -198,6 +228,7 @@ python -m unittest tests/test_pipeline.py
 │   ├── gemini_service.py      # Resilient Gemini client with primary/fallback
 │   ├── parallel_agent.py      # FlightResearcher, HotelResearcher, ActivityPlanner
 │   ├── skills.py              # LocalVibeSkill and HiddenGemSkill
+│   ├── tools.py               # GeoClusteringTool and BudgetCalculatorTool
 │   ├── loop_agent.py          # Scheduler, BudgetEnforcer, and LoopAgent
 │   └── orchestrator.py        # Sequential Pipeline orchestrator
 ├── services/

@@ -202,9 +202,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const headerDiv = document.createElement("div");
       headerDiv.className = "day-card-header";
+      const dayCost = parseFloat(day.estimated_cost || 0);
       headerDiv.innerHTML = `
         <span class="day-title">Day ${day.day}: ${escapeHtml(day.neighborhood_focus || 'City Center')}</span>
-        <span class="neighborhood-tag">📍 ${escapeHtml(day.neighborhood_focus || 'Area')}</span>
+        <div class="day-header-meta">
+          <span class="day-cost-badge">💰 Day Est: $${dayCost.toFixed(2)}</span>
+          <span class="neighborhood-tag">📍 ${escapeHtml(day.neighborhood_focus || 'Area')}</span>
+        </div>
       `;
       dayCard.appendChild(headerDiv);
 
@@ -220,17 +224,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
       (day.events || []).forEach((ev) => {
         const evRow = document.createElement("div");
-        const isGem = (ev.category || "").toLowerCase().includes("hidden gem") || ev.name.includes("Hidden Gem");
+        const bInfo = getEventBadgeInfo(ev.category, ev.name);
+        const isGem = bInfo.cls === "badge-gem";
         evRow.className = `event-row ${isGem ? 'hidden-gem' : ''}`;
 
         const costVal = parseFloat(ev.estimated_cost || 0);
         const costLabel = costVal > 0 ? `$${costVal.toFixed(2)}` : "Free";
+        const durHours = parseFloat(ev.duration_hours || 0);
+        const durationText = durHours > 0 ? `${durHours} hr${durHours === 1 ? '' : 's'}` : null;
 
         evRow.innerHTML = `
           <div class="event-primary">
-            <span class="event-time">${escapeHtml(ev.time_slot || 'Anytime')} • ${escapeHtml(ev.category || 'Sight')}</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.2rem;">
+              <span class="event-time">${escapeHtml(ev.time_slot || 'Anytime')}</span>
+              <span class="event-category-badge ${bInfo.cls}">${bInfo.icon} ${escapeHtml(bInfo.label)}</span>
+            </div>
             <span class="event-name">${escapeHtml(ev.name)}</span>
             ${ev.description ? `<span class="event-desc">${escapeHtml(ev.description)}</span>` : ''}
+            <div class="event-meta-tags">
+              ${ev.location ? `<span class="event-meta-tag">📍 ${escapeHtml(ev.location)}</span>` : ''}
+              ${durationText ? `<span class="event-meta-tag">⏱️ ${escapeHtml(durationText)}</span>` : ''}
+            </div>
           </div>
           <span class="event-cost">${costLabel}</span>
         `;
@@ -280,16 +294,16 @@ document.addEventListener("DOMContentLoaded", () => {
           : `<span class="badge badge-warning">Exceeded</span>`;
 
         tr.innerHTML = `
-          <td>${escapeHtml(run.timestamp || 'N/A')}</td>
+          <td><small style="color: var(--text-secondary);">${escapeHtml(run.timestamp || 'N/A')}</small></td>
+          <td>${escapeHtml(run.travel_date || 'Flexible')}</td>
+          <td>${escapeHtml(run.days || '1')} Days</td>
           <td><strong>${escapeHtml(run.destination || 'N/A')}</strong></td>
           <td>${escapeHtml(run.origin || 'N/A')}</td>
-          <td>${escapeHtml(run.days || '1')}d</td>
           <td>$${parseFloat(run.budget || 0).toFixed(2)}</td>
           <td>$${parseFloat(run.estimated_cost || 0).toFixed(2)}</td>
           <td>${statusBadge}</td>
-          <td>Iter ${escapeHtml(run.iterations || '1')}</td>
           <td>
-            <button class="event-count-link" data-run-id="${run.run_id}">
+            <button class="event-count-link" data-run-id="${run.run_id}" title="Click to view events below">
               <span>⚡</span>
               <span>${run.events_count || 0} events</span>
             </button>
@@ -417,7 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </span>
             <h3 style="font-size: 1.6rem; color: #fff; margin-top: 0.3rem;">${escapeHtml(user.destination || 'Trip')}</h3>
             <p style="color: var(--text-secondary); font-size: 0.85rem;">
-              Origin: ${escapeHtml(user.origin || 'N/A')} | Duration: ${user.days} Days | Target: $${parseFloat(user.budget || 0).toFixed(2)}
+              Origin: ${escapeHtml(user.origin || 'N/A')} | Travel Date: ${escapeHtml(user.departure_date || 'Flexible')} | Duration: ${user.days} Days | Target: $${parseFloat(user.budget || 0).toFixed(2)}
             </p>
           </div>
           <div class="export-actions">
@@ -442,27 +456,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <h4 style="color: #fff; margin: 1rem 0 0.5rem;">Daily Schedule</h4>
         <div class="days-container">
-          ${schedule.map(d => `
+          ${schedule.map(d => {
+            const dayCost = parseFloat(d.estimated_cost || 0);
+            return `
             <div class="day-card" style="padding: 1rem;">
               <div class="day-card-header">
-                <strong>Day ${d.day}: ${escapeHtml(d.neighborhood_focus || 'Neighborhood')}</strong>
-                <span class="neighborhood-tag">${escapeHtml(d.neighborhood_focus || 'Area')}</span>
+                <span class="day-title">Day ${d.day}: ${escapeHtml(d.neighborhood_focus || 'Neighborhood')}</span>
+                <div class="day-header-meta">
+                  <span class="day-cost-badge">💰 Day Est: $${dayCost.toFixed(2)}</span>
+                  <span class="neighborhood-tag">📍 ${escapeHtml(d.neighborhood_focus || 'Area')}</span>
+                </div>
               </div>
               ${d.insider_tip ? `<div class="day-insider-tip">💡 ${escapeHtml(d.insider_tip)}</div>` : ''}
               <div class="events-list">
-                ${(d.events || []).map(ev => `
-                  <div class="event-row">
-                    <div>
-                      <span class="event-time">${escapeHtml(ev.time_slot || '')} • ${escapeHtml(ev.category || '')}</span>
-                      <div class="event-name">${escapeHtml(ev.name)}</div>
-                      ${ev.description ? `<div class="event-desc">${escapeHtml(ev.description)}</div>` : ''}
+                ${(d.events || []).map(ev => {
+                  const bInfo = getEventBadgeInfo(ev.category, ev.name);
+                  const isGem = bInfo.cls === "badge-gem";
+                  const cVal = parseFloat(ev.estimated_cost || 0);
+                  const cLabel = cVal > 0 ? '$' + cVal.toFixed(2) : 'Free';
+                  const dHours = parseFloat(ev.duration_hours || 0);
+                  const dText = dHours > 0 ? `${dHours} hr${dHours === 1 ? '' : 's'}` : null;
+                  return `
+                  <div class="event-row ${isGem ? 'hidden-gem' : ''}">
+                    <div class="event-primary">
+                      <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.2rem;">
+                        <span class="event-time">${escapeHtml(ev.time_slot || 'Anytime')}</span>
+                        <span class="event-category-badge ${bInfo.cls}">${bInfo.icon} ${escapeHtml(bInfo.label)}</span>
+                      </div>
+                      <span class="event-name">${escapeHtml(ev.name)}</span>
+                      ${ev.description ? `<span class="event-desc">${escapeHtml(ev.description)}</span>` : ''}
+                      <div class="event-meta-tags">
+                        ${ev.location ? `<span class="event-meta-tag">📍 ${escapeHtml(ev.location)}</span>` : ''}
+                        ${dText ? `<span class="event-meta-tag">⏱️ ${escapeHtml(dText)}</span>` : ''}
+                      </div>
                     </div>
-                    <span class="event-cost">${parseFloat(ev.estimated_cost || 0) > 0 ? '$' + parseFloat(ev.estimated_cost).toFixed(2) : 'Free'}</span>
+                    <span class="event-cost">${cLabel}</span>
                   </div>
-                `).join('')}
+                `}).join('')}
               </div>
             </div>
-          `).join('')}
+          `}).join('')}
         </div>
       `;
 
@@ -471,15 +504,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Modal 2: Event Payload Popup (Requirement 11 & 12)
+  // Modal 2: Event Payload Popup (Requirement: Displays all information stored in the event)
   function showPayloadModal(event) {
     document.getElementById("modal-payload-source").textContent = event.agent_source || "Agent";
     document.getElementById("modal-payload-type").textContent = event.event_type || "Event";
     document.getElementById("modal-payload-time").textContent = event.timestamp || "";
+    document.getElementById("modal-payload-id").textContent = event.event_id || "ID";
+    document.getElementById("modal-payload-run").textContent = `Run: ${event.run_id || 'N/A'}`;
     document.getElementById("modal-payload-summary").textContent = event.summary || "";
 
-    const payloadObj = event.payload || {};
-    currentRawPayload = JSON.stringify(payloadObj, null, 2);
+    // Show all information stored in the event object
+    currentRawPayload = JSON.stringify(event, null, 2);
     document.querySelector("#modal-payload-code code").textContent = currentRawPayload;
 
     // Reset copy button state
@@ -541,6 +576,23 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
       toast.classList.add("hidden");
     }, 3500);
+  }
+
+  function getEventBadgeInfo(category, name) {
+    const cat = (category || "").toLowerCase();
+    const nm = (name || "").toLowerCase();
+    const isGem = cat.includes("hidden gem") || nm.includes("hidden gem");
+    const isBreakfast = cat.includes("breakfast") || nm.includes("breakfast");
+    const isLunch = cat.includes("lunch") || nm.includes("lunch");
+    const isDinner = cat.includes("dinner") || nm.includes("dinner");
+    const isDining = isBreakfast || isLunch || isDinner || cat.includes("dining") || cat.includes("restaurant") || cat.includes("food");
+
+    if (isBreakfast) return { cls: "badge-meal", icon: "🍳", label: "Breakfast" };
+    if (isLunch) return { cls: "badge-meal", icon: "🥗", label: "Lunch" };
+    if (isDinner) return { cls: "badge-meal", icon: "🍽️", label: "Dinner" };
+    if (isDining) return { cls: "badge-meal", icon: "🍴", label: category || "Dining" };
+    if (isGem) return { cls: "badge-gem", icon: "💎", label: category || "Hidden Gem" };
+    return { cls: "badge-sight", icon: "🏛️", label: category || "Sight" };
   }
 
   function escapeHtml(str) {

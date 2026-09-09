@@ -75,7 +75,8 @@ class PipelineOrchestrator:
                 budget_approved=approved,
                 status=status,
                 iterations=iterations,
-                events_count=events_count + 1  # including the completion event
+                events_count=events_count + 1,  # including the completion event
+                travel_date=departure_date or "Flexible"
             )
 
             Tracker.save_run_itinerary(self.run_id, state)
@@ -123,7 +124,8 @@ class PipelineOrchestrator:
                 budget_approved=False,
                 status="failed",
                 iterations=0,
-                events_count=events_count
+                events_count=events_count,
+                travel_date=departure_date or "Flexible"
             )
             return {
                 "success": False,

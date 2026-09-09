@@ -10,6 +10,60 @@ import config
 
 _lock = threading.Lock()
 
+import re
+
+API_KEY_PATTERNS = [
+    re.compile(r'AIza[0-9A-Za-z_\-]{20,}'),
+    re.compile(r'AQ\.[0-9A-Za-z_\-]{20,}'),
+]
+
+def redact_api_key(data: Any, key_to_redact: Optional[str] = None) -> Any:
+    """Recursively redacts API keys, tokens, and credentials from strings, dicts, and lists."""
+    keys = []
+    if config.GEMINI_API_KEY:
+        keys.append(config.GEMINI_API_KEY)
+    if key_to_redact:
+        keys.append(key_to_redact)
+
+    # First pass: collect any explicit secret string values from sensitive dict keys
+    def collect_keys(obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                k_lower = str(k).lower()
+                if any(term in k_lower for term in ("api_key", "apikey", "secret_key", "access_token", "auth_token")):
+                    if isinstance(v, str) and len(v.strip()) >= 4:
+                        keys.append(v.strip())
+                collect_keys(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                collect_keys(item)
+
+    collect_keys(data)
+
+    def apply_redaction(obj):
+        if isinstance(obj, str):
+            res = obj
+            for k in keys:
+                if k and k in res:
+                    res = res.replace(k, "[REDACTED_API_KEY]")
+            for pat in API_KEY_PATTERNS:
+                res = pat.sub("[REDACTED_API_KEY]", res)
+            return res
+        elif isinstance(obj, dict):
+            res = {}
+            for k, v in obj.items():
+                k_lower = str(k).lower()
+                if any(term in k_lower for term in ("api_key", "apikey", "secret_key", "access_token", "auth_token")):
+                    res[k] = "[REDACTED_API_KEY]"
+                else:
+                    res[k] = apply_redaction(v)
+            return res
+        elif isinstance(obj, list):
+            return [apply_redaction(item) for item in obj]
+        return obj
+
+    return apply_redaction(data)
+
 def _ensure_files():
     with _lock:
         if not os.path.exists(config.USAGES_CSV):
@@ -18,9 +72,10 @@ def _ensure_files():
                 writer.writerow([
                     "run_id",
                     "timestamp",
-                    "origin",
-                    "destination",
+                    "travel_date",
                     "days",
+                    "destination",
+                    "origin",
                     "budget",
                     "estimated_cost",
                     "budget_approved",
@@ -49,6 +104,10 @@ _ensure_files()
 
 class Tracker:
     @staticmethod
+    def redact(data: Any, key: Optional[str] = None) -> Any:
+        return redact_api_key(data, key)
+
+    @staticmethod
     def record_event(
         run_id: str,
         event_type: str,
@@ -56,15 +115,18 @@ class Tracker:
         summary: str,
         payload: Any = None
     ) -> Dict[str, Any]:
-        """Appends a new event entry into events.json as a single line."""
+        """Appends a new event entry into events.json as a single line with redacted API key."""
+        clean_payload = redact_api_key(payload if payload is not None else {})
+        clean_summary = redact_api_key(summary) if isinstance(summary, str) else summary
+
         event_entry = {
             "event_id": f"evt_{uuid.uuid4().hex[:8]}",
             "run_id": run_id,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "event_type": event_type,
             "agent_source": agent_source,
-            "summary": summary,
-            "payload": payload if payload is not None else {}
+            "summary": clean_summary,
+            "payload": clean_payload
         }
         with _lock:
             with open(config.EVENTS_JSON, "a", encoding="utf-8") as f:
@@ -82,24 +144,32 @@ class Tracker:
         budget_approved: bool,
         status: str,
         iterations: int,
-        events_count: int
+        events_count: int,
+        travel_date: Optional[str] = None
     ):
         """Appends or updates a record in usages.csv."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        formatted_travel_date = travel_date.strip() if travel_date and travel_date.strip() else "Flexible"
+
+        fieldnames = [
+            "run_id", "timestamp", "travel_date", "days", "destination",
+            "origin", "budget", "estimated_cost", "budget_approved", "status",
+            "iterations", "events_count"
+        ]
+
         with _lock:
-            # Check if run_id already exists (update if so, else append)
             rows = []
             updated = False
             if os.path.exists(config.USAGES_CSV):
                 with open(config.USAGES_CSV, "r", newline="", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames
                     for row in reader:
                         if row.get("run_id") == run_id:
                             row["timestamp"] = timestamp
-                            row["origin"] = origin
-                            row["destination"] = destination
+                            row["travel_date"] = formatted_travel_date
                             row["days"] = str(days)
+                            row["destination"] = destination
+                            row["origin"] = origin
                             row["budget"] = f"{budget:.2f}"
                             row["estimated_cost"] = f"{estimated_cost:.2f}"
                             row["budget_approved"] = str(budget_approved)
@@ -107,15 +177,19 @@ class Tracker:
                             row["iterations"] = str(iterations)
                             row["events_count"] = str(events_count)
                             updated = True
+                        else:
+                            if "travel_date" not in row:
+                                row["travel_date"] = "Flexible"
                         rows.append(row)
 
             if not updated:
                 rows.append({
                     "run_id": run_id,
                     "timestamp": timestamp,
-                    "origin": origin,
-                    "destination": destination,
+                    "travel_date": formatted_travel_date,
                     "days": str(days),
+                    "destination": destination,
+                    "origin": origin,
                     "budget": f"{budget:.2f}",
                     "estimated_cost": f"{estimated_cost:.2f}",
                     "budget_approved": str(budget_approved),
@@ -124,11 +198,6 @@ class Tracker:
                     "events_count": str(events_count)
                 })
 
-            fieldnames = [
-                "run_id", "timestamp", "origin", "destination", "days",
-                "budget", "estimated_cost", "budget_approved", "status",
-                "iterations", "events_count"
-            ]
             with open(config.USAGES_CSV, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()

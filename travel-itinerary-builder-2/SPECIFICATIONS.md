@@ -16,6 +16,15 @@ The app should have 2 pages selectable using the tab bar at the top of the page.
   - departure date (optional)
   - duration
 - After the user submits the form, the app will display:
+  - The generated itinerary should be shown in a detailed, day-by-day format. Each day should be clearly separated and include:
+    - The day number and the estimated cost for that day.
+    - The activity should suggest where to eat for all meals for the day including the breakfast, lunch, and dinner. 
+    - The time slot for each activity.
+    - The name of the activity.
+    - The estimated cost for each activity.
+    - The duration for each activity.
+    - The location of each activity.
+    - Any other relevant information about the activity.
   - A status indicator showing the current step in the itinerary generation process.
   - The app will group the activities geographically each day to prevent excessive travel time.
   - The app will enforce strict budgetary boundaries.
@@ -31,14 +40,14 @@ This page is for displaying the past Itineraries and Event logs.
   - When the events count in each row is clicked, all the event logs for that run should be shown in the second table below the itinerary table.
 
 - Each row of the event log should show the details for each request including the timestamp, event type, agent/source of the event, a short summary of the event log, and a "Payload" button to show details about the event log.
-  - When the "Payload" button is clicked, it should display the full payload for that event log in a pop up window.
+  - When the "Payload" button is clicked, it should display the full and complete payloads for that event log in a pop up window.
   - The pop up window should display all information stored in the event
   - It should include a "Copy to Clipboard" button to allow the user to copy the contents of the payload to the clipboard.
 
 ## Other Requirements
 - The app should get the API Key from the environment variable GEMINI_API_KEY, model name from the environment variable GEMINI_MODEL, and fallback model name from the environment variable GEMINI_FALLBACK_MODEL. Use the fallback model name if the primary model name is not available.
 - The app should store the information from each user request in a CSV file named usages.csv in the artifacts folder.
-- The app should store the events and interactions including the actual payload between the agent, skills, tools, models, and etc in a file named events.json in the artifacts folder.
+- The app should store the events and interactions including the **full and complete** payloads between the agent, skills, tools, LLM models, and etc in a file named events.json in the artifacts folder.
   - Each entry in the events.json file should be a separate JSON object, on its own line.
   - The app should redact the API Key from the event payload before storing it in the events.json file. 
 - Create a README.md file to show how to run the app and how the app works

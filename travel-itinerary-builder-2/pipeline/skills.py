@@ -9,8 +9,13 @@ class LocalVibeSkill:
         self.gemini = gemini
         self.run_id = run_id
         self.name = "Skill:LocalVibe"
+        self._cache: Dict[str, str] = {}
 
     def execute(self, destination: str, neighborhood: str, day_number: int) -> str:
+        cache_key = f"{destination.strip().lower()}:{neighborhood.strip().lower()}:{day_number}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
         prompt = f"""
 Provide one fun, highly practical 1-sentence local insider tip or secret etiquette for exploring the '{neighborhood}' district of {destination} on Day {day_number}.
 Be concise, inspiring, and culturally authentic.
@@ -32,6 +37,8 @@ Be concise, inspiring, and culturally authentic.
                 f"Pro-tip: Download the local transit contactless card on your phone for seamless transfers around {neighborhood}."
             ]
             cleaned = defaults[(day_number - 1) % len(defaults)]
+
+        self._cache[cache_key] = cleaned
 
         Tracker.record_event(
             self.run_id,
@@ -56,8 +63,14 @@ class HiddenGemSkill:
         self.gemini = gemini
         self.run_id = run_id
         self.name = "Skill:HiddenGem"
+        self._cache: Dict[str, Dict[str, Any]] = {}
 
     def execute(self, destination: str, interests: List[str]) -> Dict[str, Any]:
+        interests_key = tuple(sorted([i.strip().lower() for i in interests])) if interests else ()
+        cache_key = f"{destination.strip().lower()}:{interests_key}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
         prompt = f"""
 Suggest ONE charming, low-cost or free 'hidden gem' activity in {destination} catering to interests: {', '.join(interests)}.
 Return ONLY valid JSON with keys: "title", "neighborhood", "description", "estimated_cost" (number).
@@ -93,6 +106,8 @@ Return ONLY valid JSON with keys: "title", "neighborhood", "description", "estim
                 "description": "A tucked-away historic glass arcade with antique bookstalls and a quiet courtyard fountain.",
                 "estimated_cost": 0.0
             }
+
+        self._cache[cache_key] = gem_data
 
         Tracker.record_event(
             self.run_id,

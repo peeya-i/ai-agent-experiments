@@ -212,13 +212,13 @@
     <!-- ============================================================= -->
     <section id="view-logs" class="tab-pane" role="tabpanel">
       
-      <!-- Summary Metric Cards (Requirement 7) -->
+      <!-- Summary Metric Cards (Requirement: Summary of itineraries requested, generated, failed, and events logged) -->
       <div class="metrics-grid">
         <div class="metric-card">
           <div class="metric-icon icon-blue">📋</div>
           <div class="metric-info">
             <span class="metric-num" id="metric-total-itineraries">0</span>
-            <span class="metric-label">Itineraries Created</span>
+            <span class="metric-label">Itineraries Requested</span>
           </div>
         </div>
 
@@ -226,7 +226,7 @@
           <div class="metric-icon icon-green">✅</div>
           <div class="metric-info">
             <span class="metric-num" id="metric-successful-runs">0</span>
-            <span class="metric-label">Successful Runs</span>
+            <span class="metric-label">Itineraries Generated</span>
           </div>
         </div>
 
@@ -234,7 +234,7 @@
           <div class="metric-icon icon-amber">⚠️</div>
           <div class="metric-info">
             <span class="metric-num" id="metric-failed-runs">0</span>
-            <span class="metric-label">Budget Exceeded / Failed</span>
+            <span class="metric-label">Failed Requests</span>
           </div>
         </div>
 
@@ -242,17 +242,17 @@
           <div class="metric-icon icon-purple">⚡</div>
           <div class="metric-info">
             <span class="metric-num" id="metric-total-events">0</span>
-            <span class="metric-label">Event Logs Stored</span>
+            <span class="metric-label">Events Logged</span>
           </div>
         </div>
       </div>
 
-      <!-- Table 1: Itineraries Created (Requirement 8) -->
+      <!-- Table 1: Itineraries Requested (Requirement: Created At, Travel Date, Duration, Destination, Origin, Budget, Est Cost, Status, Event Logs) -->
       <div class="table-card">
         <div class="table-card-header">
           <div>
-            <h3>Itinerary Runs History</h3>
-            <p class="section-desc">Click any row to view its full itinerary in a popup. Click the <strong>Events Count</strong> to inspect the execution event log below.</p>
+            <h3>Itineraries Requested</h3>
+            <p class="section-desc">Click any row to view its full itinerary in a popup. Click the <strong>Events Count</strong> to view all event logs for that run in the table below.</p>
           </div>
           <button id="btn-refresh-history" class="btn btn-secondary btn-sm">
             <span>🔄 Refresh History</span>
@@ -264,13 +264,13 @@
             <thead>
               <tr>
                 <th>Created At</th>
+                <th>Travel Date</th>
+                <th>Duration</th>
                 <th>Destination</th>
-                <th>Origin</th>
-                <th>Days</th>
+                <th>City of Origin</th>
                 <th>Budget</th>
-                <th>Est. Cost</th>
+                <th>Estimated Cost</th>
                 <th>Status</th>
-                <th>Iterations</th>
                 <th>Event Logs</th>
               </tr>
             </thead>
@@ -283,12 +283,12 @@
         </div>
       </div>
 
-      <!-- Table 2: Event Logs for Selected Run (Requirement 10) -->
+      <!-- Table 2: Event Logs for Selected Run (Requirement: Timestamp, Event Type, Agent/Source, Summary, Payload Button) -->
       <div class="table-card" id="card-events-section">
         <div class="table-card-header">
           <div>
             <h3 id="events-table-title">Execution Event Logs</h3>
-            <p class="section-desc" id="events-table-subtitle">Select an itinerary above or click its event count to display its internal multi-agent lifecycle events.</p>
+            <p class="section-desc" id="events-table-subtitle">Select an itinerary above or click its event count to display its event logs.</p>
           </div>
           <span id="selected-run-badge" class="badge badge-neutral">No Run Selected</span>
         </div>
@@ -318,7 +318,7 @@
   </main>
 
   <!-- ============================================================= -->
-  <!-- MODAL 1: FULL ITINERARY POPUP WINDOW (Requirement 9)           -->
+  <!-- MODAL 1: FULL ITINERARY POPUP WINDOW (Requirement)             -->
   <!-- ============================================================= -->
   <div id="modal-itinerary" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-itinerary-title">
     <div class="modal-container">
@@ -336,28 +336,34 @@
   </div>
 
   <!-- ============================================================= -->
-  <!-- MODAL 2: EVENT PAYLOAD POPUP & COPY (Requirement 11 & 12)     -->
+  <!-- MODAL 2: EVENT PAYLOAD POPUP & COPY (Requirement)              -->
+  <!-- Displays all information stored in the event with copy button  -->
   <!-- ============================================================= -->
   <div id="modal-payload" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-payload-title">
     <div class="modal-container modal-payload-dialog">
       <div class="modal-header">
         <div class="modal-header-text">
-          <h3 id="modal-payload-title">Event Payload Details</h3>
+          <h3 id="modal-payload-title">Event Details & Payload</h3>
           <span id="modal-payload-source" class="badge badge-accent">Agent</span>
         </div>
         <button class="btn-close-modal" id="btn-close-payload-modal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <div class="payload-meta-strip">
+          <span id="modal-payload-id" class="meta-tag">Event ID</span>
+          <span id="modal-payload-run" class="meta-tag">Run ID</span>
           <span id="modal-payload-type" class="meta-tag">Event Type</span>
           <span id="modal-payload-time" class="meta-tag">Timestamp</span>
         </div>
-        <p id="modal-payload-summary" class="payload-summary-text"></p>
+        <div class="event-summary-box" style="margin-bottom: 1rem; background: rgba(255,255,255,0.03); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+          <strong style="color: var(--text-primary); font-size: 0.85rem;">Summary:</strong>
+          <span id="modal-payload-summary" class="payload-summary-text" style="color: var(--text-secondary); margin-left: 0.5rem; font-size: 0.88rem;"></span>
+        </div>
         
         <div class="code-container">
           <div class="code-header">
-            <span>JSON Payload</span>
-            <!-- Clipboard Copy Button (Requirement 12) -->
+            <span>Event Payload Data (All Fields)</span>
+            <!-- Clipboard Copy Button (Requirement) -->
             <button id="btn-copy-payload" class="btn btn-copy">
               <span id="copy-icon">📋</span>
               <span id="copy-text">Copy to Clipboard</span>

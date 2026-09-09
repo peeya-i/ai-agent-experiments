@@ -2,6 +2,7 @@
 import os
 import unittest
 import json
+import uuid
 from pipeline.state import create_initial_state
 from pipeline.gemini_service import GeminiService
 from pipeline.parallel_agent import ParallelAgent
@@ -114,12 +115,18 @@ class TestItineraryPipeline(unittest.TestCase):
             budget_approved=True,
             status="success",
             iterations=1,
-            events_count=3
+            events_count=3,
+            travel_date="2026-10-15"
         )
 
         metrics = Tracker.get_metrics()
         self.assertGreaterEqual(metrics["total_itineraries"], 1)
         self.assertGreaterEqual(metrics["total_events"], 1)
+
+        usages = Tracker.get_all_usages()
+        test_usage = next((u for u in usages if u.get("run_id") == test_run), None)
+        self.assertIsNotNone(test_usage)
+        self.assertEqual(test_usage.get("travel_date"), "2026-10-15")
 
         run_events = Tracker.get_events_for_run(test_run)
         self.assertTrue(len(run_events) >= 1)
@@ -136,9 +143,50 @@ class TestItineraryPipeline(unittest.TestCase):
                     self.assertIn("event_id", ev_obj)
                     self.assertIn("payload", ev_obj)
 
+    def test_api_key_redaction_in_events(self):
+        """Verifies that API keys are redacted from event payloads and summaries before saving to events.json."""
+        redact_run = f"redaction_test_{uuid.uuid4().hex[:8]}"
+        dummy_key = "AIzaSySecretApiKey12345XYZ"
+        
+        # Test direct redaction method
+        dirty_payload = {
+            "api_key": dummy_key,
+            "nested": {
+                "auth_token": "secret_token_abc",
+                "message": f"Calling API using key {dummy_key} for user"
+            },
+            "list_items": [f"Header: Bearer {dummy_key}"]
+        }
+        
+        Tracker.record_event(
+            run_id=redact_run,
+            event_type="test_redaction_event",
+            agent_source="RedactionTester",
+            summary=f"Event summary with key {dummy_key}",
+            payload=dirty_payload
+        )
+        
+        events = Tracker.get_events_for_run(redact_run)
+        self.assertTrue(len(events) >= 1)
+        test_ev = next(e for e in events if e.get("run_id") == redact_run)
+        
+        # Ensure raw key never appears in payload or summary
+        payload_str = json.dumps(test_ev["payload"])
+        summary_str = test_ev["summary"]
+        self.assertNotIn(dummy_key, payload_str)
+        self.assertNotIn(dummy_key, summary_str)
+        
+        # Verify raw events.json file line also does not contain the dummy key
+        with open(config.EVENTS_JSON, "r", encoding="utf-8") as f:
+            for line in f:
+                if redact_run in line:
+                    self.assertNotIn(dummy_key, line)
+                    self.assertIn("[REDACTED_API_KEY]", line)
+
     def test_invocations_requests_responses_payloads(self):
         """Verifies that invocations, requests, and responses for agents, skills, and models are recorded with payloads."""
-        orchestrator = PipelineOrchestrator(run_id="req_resp_test_run")
+        test_run_id = f"req_resp_{uuid.uuid4().hex[:8]}"
+        orchestrator = PipelineOrchestrator(run_id=test_run_id)
         result = orchestrator.run(
             origin="Boston, USA",
             destination="Dublin, Ireland",
@@ -148,7 +196,7 @@ class TestItineraryPipeline(unittest.TestCase):
         )
         self.assertTrue(result["success"])
 
-        events = Tracker.get_events_for_run("req_resp_test_run")
+        events = Tracker.get_events_for_run(test_run_id)
         event_types = [e["event_type"] for e in events]
 
         # Model requests and responses
@@ -163,6 +211,10 @@ class TestItineraryPipeline(unittest.TestCase):
         self.assertIn("skill_request", event_types)
         self.assertIn("skill_response", event_types)
 
+        # Tool requests and responses
+        self.assertIn("tool_request", event_types)
+        self.assertIn("tool_response", event_types)
+
         # Pipeline request and response
         self.assertIn("pipeline_request", event_types)
         self.assertIn("pipeline_response", event_types)
@@ -170,9 +222,15 @@ class TestItineraryPipeline(unittest.TestCase):
         # Verify actual payloads are populated
         model_req = next(e for e in events if e["event_type"] == "model_request")
         self.assertIn("prompt", model_req["payload"])
+        self.assertIn("contents", model_req["payload"])
+        self.assertIn("model", model_req["payload"])
+        self.assertIn("generation_config", model_req["payload"])
 
         model_resp = next(e for e in events if e["event_type"] == "model_response")
         self.assertIn("response", model_resp["payload"])
+        self.assertIn("candidates", model_resp["payload"])
+        self.assertIn("usage_metadata", model_resp["payload"])
+        self.assertIn("model_version", model_resp["payload"])
 
         agent_req = next(e for e in events if e["event_type"] == "agent_request" and e["agent_source"] == "FlightResearcher")
         self.assertIn("destination", agent_req["payload"])
@@ -230,12 +288,20 @@ class TestItineraryPipeline(unittest.TestCase):
             "destination": "Vancouver, Canada",
             "duration": 2,
             "budget": 800,
+            "departure_date": "2026-11-20",
             "interests": "Coffee, Mountains"
         })
         self.assertEqual(res.status_code, 200)
         gen_data = res.get_json()
         self.assertTrue(gen_data["success"])
         run_id = gen_data["run_id"]
+
+        # Verify departure_date in history
+        res_hist = client.get("/api/history")
+        hist_data = res_hist.get_json()
+        run_record = next((r for r in hist_data["itineraries"] if r.get("run_id") == run_id), None)
+        self.assertIsNotNone(run_record)
+        self.assertEqual(run_record.get("travel_date"), "2026-11-20")
 
         # Test Events for Run
         res = client.get(f"/api/events/{run_id}")
@@ -249,6 +315,51 @@ class TestItineraryPipeline(unittest.TestCase):
 
         res_pdf = client.get(f"/download/pdf/{run_id}")
         self.assertEqual(res_pdf.status_code, 200)
+
+    def test_detailed_day_by_day_schedule_requirements(self):
+        """Verifies each day contains Day number, estimated_cost, Breakfast, Lunch, Dinner, and activities have location & duration."""
+        orchestrator = PipelineOrchestrator(run_id="schedule_detail_test_run")
+        result = orchestrator.run(
+            origin="San Francisco, USA",
+            destination="Lisbon, Portugal",
+            days=2,
+            budget=1600.0,
+            interests=["Pastries", "Tram 28", "Fado"],
+            departure_date="2026-10-01"
+        )
+        self.assertTrue(result["success"])
+        itin = result["state"]["current_itinerary"]
+        schedule = itin.get("schedule", [])
+        self.assertEqual(len(schedule), 2)
+
+        for day in schedule:
+            # 1. Day number and estimated cost for that day
+            self.assertIn("day", day)
+            self.assertIn("estimated_cost", day)
+            self.assertGreater(day["estimated_cost"], 0)
+
+            # 2. Suggested dining for all meals: Breakfast, Lunch, Dinner
+            categories = [e.get("category", "").lower() for e in day.get("events", [])]
+            has_breakfast = any("breakfast" in c for c in categories)
+            has_lunch = any("lunch" in c for c in categories)
+            has_dinner = any("dinner" in c for c in categories)
+
+            self.assertTrue(has_breakfast, f"Day {day['day']} missing Breakfast")
+            self.assertTrue(has_lunch, f"Day {day['day']} missing Lunch")
+            self.assertTrue(has_dinner, f"Day {day['day']} missing Dinner")
+
+            # 3. For every activity: Time slot, Name, Estimated cost, Duration, Location
+            for ev in day.get("events", []):
+                self.assertIn("name", ev)
+                self.assertTrue(bool(ev["name"]))
+                self.assertIn("time_slot", ev)
+                self.assertTrue(bool(ev["time_slot"]))
+                self.assertIn("estimated_cost", ev)
+                self.assertIsInstance(ev["estimated_cost"], (int, float))
+                self.assertIn("location", ev)
+                self.assertTrue(bool(ev["location"]))
+                self.assertIn("duration_hours", ev)
+                self.assertGreater(ev["duration_hours"], 0)
 
 if __name__ == "__main__":
     unittest.main()

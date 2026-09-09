@@ -36,14 +36,18 @@ def generate_text_itinerary(state: Dict[str, Any]) -> str:
     # Schedule
     lines.append("\n[DAY-BY-DAY SCHEDULE]")
     for day in schedule:
-        lines.append(f"\n--- DAY {day.get('day')}: {day.get('neighborhood_focus', 'City Exploration').upper()} ---")
+        day_cost = float(day.get("estimated_cost", 0.0))
+        lines.append(f"\n--- DAY {day.get('day')}: {day.get('neighborhood_focus', 'City Exploration').upper()} | Estimated Cost: ${day_cost:,.2f} ---")
         if day.get("insider_tip"):
             lines.append(f"  Insider Tip: {day.get('insider_tip')}")
         for ev in day.get("events", []):
-            cost_str = f"${ev.get('estimated_cost'):,.2f}" if ev.get("estimated_cost", 0) > 0 else "FREE"
+            cost_str = f"${float(ev.get('estimated_cost', 0)):,.2f}" if float(ev.get("estimated_cost", 0)) > 0 else "FREE"
+            dur_str = f"{float(ev.get('duration_hours', 1.0)):.1f} hrs"
+            loc_str = ev.get("location", "Local Area")
             lines.append(f"  • [{ev.get('time_slot', 'Activity')}] {ev.get('name')} ({cost_str})")
+            lines.append(f"      Category: {ev.get('category', 'Experience')} | Duration: {dur_str} | Location: {loc_str}")
             if ev.get("description"):
-                lines.append(f"      {ev.get('description')}")
+                lines.append(f"      Details: {ev.get('description')}")
 
     if state.get("critic_feedback"):
         lines.append("\n" + "-" * 60)
@@ -101,42 +105,44 @@ def generate_pdf_itinerary(state: Dict[str, Any]) -> io.BytesIO:
             parent=styles['Heading2'],
             fontSize=13,
             leading=17,
-            textColor=colors.HexColor("#0284c7"),
-            spaceBefore=10,
+            textColor=colors.HexColor("#0f172a"),
+            spaceBefore=8,
             spaceAfter=4
-        )
-        normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=styles['Normal'],
-            fontSize=9,
-            leading=12,
-            textColor=colors.HexColor("#334155")
         )
         tip_style = ParagraphStyle(
             'TipStyle',
-            parent=styles['Italic'],
+            parent=styles['Normal'],
+            fontSize=9,
+            leading=12,
+            textColor=colors.HexColor("#4338ca"),
+            spaceAfter=6
+        )
+        normal_style = ParagraphStyle(
+            'NormalStyle',
+            parent=styles['Normal'],
             fontSize=8.5,
             leading=11,
-            textColor=colors.HexColor("#0d9488"),
-            spaceAfter=4
+            textColor=colors.HexColor("#334155")
         )
 
         elements = []
 
-        # Header Title
-        dest = user_input.get("destination", "Vacation").title()
-        elements.append(Paragraph(f"Travel Itinerary: {dest}", title_style))
+        # Title
+        dest = user_input.get("destination", "Vacation Destination").upper()
+        elements.append(Paragraph(f"<b>{dest}</b> ITINERARY", title_style))
         elements.append(Paragraph(
-            f"Prepared for trip from <b>{user_input.get('origin', 'Origin')}</b> | Duration: <b>{user_input.get('days')} Days</b> | Departure: <b>{user_input.get('departure_date') or 'Flexible'}</b>",
+            f"Origin: <b>{user_input.get('origin', 'N/A')}</b> &nbsp;|&nbsp; "
+            f"Departure: <b>{user_input.get('departure_date') or 'Flexible'}</b> &nbsp;|&nbsp; "
+            f"Duration: <b>{user_input.get('days', 1)} Days</b>",
             subtitle_style
         ))
-        elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#cbd5e1"), spaceAfter=10))
+        elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=10))
 
-        # Financial Summary Table
+        # Financial Summary Card Table
         budget_val = float(user_input.get("budget", 0))
         cost_val = float(itinerary.get("total_estimated_cost", 0))
-        status_txt = "APPROVED (Within Budget)" if state.get("budget_approved") else "BUDGET EXCEEDED"
-        status_color = colors.HexColor("#16a34a") if state.get("budget_approved") else colors.HexColor("#dc2626")
+        status_txt = "BUDGET APPROVED" if state.get("budget_approved") else "BUDGET EXCEEDED"
+        status_color = "#16a34a" if state.get("budget_approved") else "#ea580c"
 
         summary_data = [
             [
@@ -147,7 +153,7 @@ def generate_pdf_itinerary(state: Dict[str, Any]) -> io.BytesIO:
             [
                 Paragraph(f"<b>Transit:</b> ${cost_breakdown.get('flight', 0):,.2f}", normal_style),
                 Paragraph(f"<b>Lodging:</b> ${cost_breakdown.get('lodging', 0):,.2f}", normal_style),
-                Paragraph(f"<b>Activities:</b> ${cost_breakdown.get('activities', 0):,.2f}", normal_style)
+                Paragraph(f"<b>Activities & Dining:</b> ${cost_breakdown.get('activities', 0):,.2f}", normal_style)
             ]
         ]
         summary_table = Table(summary_data, colWidths=[180, 180, 180])
@@ -178,25 +184,36 @@ def generate_pdf_itinerary(state: Dict[str, Any]) -> io.BytesIO:
         for day in schedule:
             d_num = day.get("day")
             nb = day.get("neighborhood_focus", "Area")
-            elements.append(Paragraph(f"<b>Day {d_num}: {nb} District</b>", heading2_style))
+            day_cost = float(day.get("estimated_cost", 0.0))
+            elements.append(Paragraph(f"<b>Day {d_num}: {nb} District</b> &nbsp;—&nbsp; <font color='#2563eb'><b>Estimated Day Cost: ${day_cost:,.2f}</b></font>", heading2_style))
             if day.get("insider_tip"):
                 elements.append(Paragraph(f"💡 {day.get('insider_tip')}", tip_style))
 
-            day_rows = [["Time", "Activity", "Category", "Cost"]]
+            day_rows = [["Time Slot", "Activity & Location", "Duration", "Cost"]]
             for ev in day.get("events", []):
-                cost_str = f"${ev.get('estimated_cost'):,.2f}" if ev.get("estimated_cost", 0) > 0 else "Free"
+                cost_str = f"${float(ev.get('estimated_cost', 0)):,.2f}" if float(ev.get("estimated_cost", 0)) > 0 else "Free"
+                dur_str = f"{float(ev.get('duration_hours', 1.0)):.1f} hr"
+                desc_txt = ev.get('description', '')
+                desc_snippet = f"<br/><font color='#64748b'>{desc_txt[:90]}...</font>" if len(desc_txt) > 90 else f"<br/><font color='#64748b'>{desc_txt}</font>"
+                activity_cell = Paragraph(
+                    f"<b>{ev.get('name', 'Event')}</b> <font color='#64748b'>({ev.get('category', 'Activity')})</font><br/>"
+                    f"<font color='#0284c7'>📍 {ev.get('location', nb)}</font>"
+                    f"{desc_snippet}",
+                    normal_style
+                )
                 day_rows.append([
-                    ev.get("time_slot", "").split(" ")[0],
-                    ev.get("name", "Event"),
-                    ev.get("category", "Sight"),
-                    cost_str
+                    Paragraph(ev.get("time_slot", "").replace(" - ", "<br/>"), normal_style),
+                    activity_cell,
+                    Paragraph(dur_str, normal_style),
+                    Paragraph(cost_str, normal_style)
                 ])
-            t = Table(day_rows, colWidths=[75, 275, 110, 80])
+            t = Table(day_rows, colWidths=[90, 310, 60, 80])
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor("#334155")),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),

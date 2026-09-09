@@ -168,25 +168,26 @@ class ActivityPlanner:
 
         prompt = f"""
 You are a specialized ActivityPlanner agent.
-Compile 6 to 10 top attractions, landmarks, local dining experiences, and tours for {destination}.
+Compile top attractions, landmarks, and authentic meal dining experiences (including breakfast cafes, lunch spots, and dinner dining) for {destination}.
 Duration: {days} days.
 Interests: {', '.join(interests) if interests else 'Culture, Food, Sights'}.
 Budget: ${budget}.
 
 Group activities into distinct geographic areas/neighborhoods to minimize travel time between them.
 Respond ONLY with a valid JSON array containing objects with these exact keys:
-- "name": attraction or activity name
+- "name": attraction or restaurant/cafe name
 - "neighborhood": geographic neighborhood / district in {destination}
-- "category": e.g. "Landmark", "Museum", "Food & Dining", "Outdoor & Park", "Culture", "Hidden Gem"
+- "location": specific address, street, or landmark location in {destination}
+- "category": e.g. "Breakfast", "Lunch", "Dinner", "Landmark", "Museum", "Food & Dining", "Culture", "Outdoor & Park", or "Hidden Gem"
 - "estimated_cost": estimated ticket or meal price in USD (number, use 0 for free sights)
-- "duration_hours": estimated time needed (number, e.g. 1.5, 2.0)
-- "description": brief sentence explaining what to see or do
+- "duration_hours": estimated time needed (number, e.g. 1.0, 1.5, 2.0)
+- "description": brief description of what to see or eat, including specialty dishes or features
 """
         Tracker.record_event(
             self.run_id,
             "agent_request",
             self.name,
-            f"Compiling activities and attractions in {destination}",
+            f"Compiling activities, landmarks, and dining recommendations in {destination}",
             {"destination": destination, "interests": interests, "days": days, "budget": budget}
         )
 
@@ -194,14 +195,21 @@ Respond ONLY with a valid JSON array containing objects with these exact keys:
         activities = self._parse_json(resp_text)
         if not activities:
             activities = [
-                {"name": f"{destination} Historic Old Town Walking Tour", "neighborhood": "Old Town", "category": "Culture", "estimated_cost": 0.0, "duration_hours": 2.0, "description": "Explore cobblestone alleys, historic architecture, and artisan shops."},
-                {"name": f"Grand Cathedral & Belfry Tower", "neighborhood": "Old Town", "category": "Landmark", "estimated_cost": 15.0, "duration_hours": 1.5, "description": "Iconic cathedral with panoramic city views from the tower."},
-                {"name": "Local Street Food & Artisan Market", "neighborhood": "Old Town", "category": "Food & Dining", "estimated_cost": 25.0, "duration_hours": 1.5, "description": "Sample fresh local delicacies and specialty pastries."},
-                {"name": f"{destination} National Art & Heritage Museum", "neighborhood": "Museum Quarter", "category": "Museum", "estimated_cost": 18.0, "duration_hours": 2.5, "description": "Masterpieces, historical artifacts, and immersive exhibitions."},
-                {"name": "Botanical Gardens & Tea Pavilion", "neighborhood": "Museum Quarter", "category": "Outdoor & Park", "estimated_cost": 8.0, "duration_hours": 1.5, "description": "Peaceful gardens with exotic flora and historic greenhouse."},
-                {"name": "Scenic Riverfront Promenade & Sunset Viewpoint", "neighborhood": "Waterfront", "category": "Sightseeing", "estimated_cost": 0.0, "duration_hours": 1.5, "description": "Relaxing stroll along the water with evening skyline views."},
-                {"name": "Waterfront Seafood & Grill Dinner", "neighborhood": "Waterfront", "category": "Food & Dining", "estimated_cost": 35.0, "duration_hours": 2.0, "description": "Fresh regional cuisine overlooking the harbor lights."},
-                {"name": "Artisan Craft Workshops & Coffee Roasters", "neighborhood": "Arts District", "category": "Hidden Gem", "estimated_cost": 12.0, "duration_hours": 2.0, "description": "Locally-owned craft studios and third-wave coffee tastings."}
+                {"name": f"{destination} Artisan Bakery & Morning Cafe", "neighborhood": "Old Town", "location": f"Main Market Square, Old Town, {destination}", "category": "Breakfast", "estimated_cost": 12.0, "duration_hours": 1.0, "description": "Freshly baked morning breads, local pastries, and specialty espresso."},
+                {"name": f"{destination} Historic Old Town Walking Tour", "neighborhood": "Old Town", "location": f"Historic Center, {destination}", "category": "Culture", "estimated_cost": 0.0, "duration_hours": 2.0, "description": "Explore cobblestone alleys, historic architecture, and artisan shops."},
+                {"name": "Old Town Heritage Trattoria", "neighborhood": "Old Town", "location": f"Via San Marco, Old Town, {destination}", "category": "Lunch", "estimated_cost": 22.0, "duration_hours": 1.0, "description": "Traditional lunch menu featuring regional handmade pasta and seasonal produce."},
+                {"name": f"Grand Cathedral & Belfry Tower", "neighborhood": "Old Town", "location": f"Cathedral Plaza, Old Town, {destination}", "category": "Landmark", "estimated_cost": 15.0, "duration_hours": 1.5, "description": "Iconic cathedral with panoramic city views from the tower."},
+                {"name": "Old Town Cellar & Grill Dinner", "neighborhood": "Old Town", "location": f"Lantern Lane, Old Town, {destination}", "category": "Dinner", "estimated_cost": 36.0, "duration_hours": 2.0, "description": "Cozy candlelight dinner serving authentic signature regional dishes and wines."},
+                {"name": "Morning Espresso & Botanical Cafe", "neighborhood": "Museum Quarter", "location": f"Avenue des Arts, Museum Quarter, {destination}", "category": "Breakfast", "estimated_cost": 10.0, "duration_hours": 1.0, "description": "Light artisan breakfast overlooking the city botanical grounds."},
+                {"name": f"{destination} National Art & Heritage Museum", "neighborhood": "Museum Quarter", "location": f"Museum Plaza, {destination}", "category": "Museum", "estimated_cost": 18.0, "duration_hours": 2.5, "description": "Masterpieces, historical artifacts, and immersive exhibitions."},
+                {"name": "Museum Quarter Brasserie", "neighborhood": "Museum Quarter", "location": f"Boulevard Royale, Museum Quarter, {destination}", "category": "Lunch", "estimated_cost": 20.0, "duration_hours": 1.0, "description": "Vibrant terrace brasserie with gourmet sandwiches, salads, and artisan ciders."},
+                {"name": "Botanical Gardens & Tea Pavilion", "neighborhood": "Museum Quarter", "location": f"Gardens North Gate, {destination}", "category": "Outdoor & Park", "estimated_cost": 8.0, "duration_hours": 1.5, "description": "Peaceful gardens with exotic flora and historic greenhouse."},
+                {"name": "Museum Quarter Gastropub", "neighborhood": "Museum Quarter", "location": f"Gallery Walk, Museum Quarter, {destination}", "category": "Dinner", "estimated_cost": 32.0, "duration_hours": 2.0, "description": "Craft local brews and inventive farm-to-table dinner plates."},
+                {"name": "Harborfront Breakfast Bakery", "neighborhood": "Waterfront", "location": f"Pier 4 Promenade, Waterfront, {destination}", "category": "Breakfast", "estimated_cost": 12.0, "duration_hours": 1.0, "description": "Sunrise harbor views with fresh fruit bowls and warm breakfast pastries."},
+                {"name": "Scenic Riverfront Promenade & Lookout", "neighborhood": "Waterfront", "location": f"Riverside Walkway, {destination}", "category": "Sightseeing", "estimated_cost": 0.0, "duration_hours": 1.5, "description": "Relaxing stroll along the water with panoramic city skyline views."},
+                {"name": "Waterfront Catch & Oyster Bar", "neighborhood": "Waterfront", "location": f"Marina Esplanade, Waterfront, {destination}", "category": "Lunch", "estimated_cost": 25.0, "duration_hours": 1.0, "description": "Fresh maritime lunch with regional catch of the day and chilled drinks."},
+                {"name": "Maritime History Harbor Cruise", "neighborhood": "Waterfront", "location": f"Ferry Terminal 2, Waterfront, {destination}", "category": "Culture", "estimated_cost": 22.0, "duration_hours": 1.5, "description": "Guided scenic cruise narrating the port city's trade and nautical history."},
+                {"name": "Sunset Pier Seafood & Grill Dinner", "neighborhood": "Waterfront", "location": f"Old Dockway, Waterfront, {destination}", "category": "Dinner", "estimated_cost": 42.0, "duration_hours": 2.0, "description": "Fresh regional seafood overlooking the illuminated harbor."}
             ]
 
         Tracker.record_event(
