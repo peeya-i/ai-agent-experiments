@@ -2,4 +2,4 @@
 .env
 __pycache__
 
-skill_AI_agent.log
+*.log
