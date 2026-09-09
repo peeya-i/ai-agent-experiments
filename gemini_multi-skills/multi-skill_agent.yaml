@@ -1,0 +1,20 @@
+# Skill AI Agent
+Create 2 skills using the structure of Gemini skills found in the sample code:
+  - The skill_1.md file will help the AI Agent when the user asks the question about the weather in a specific city and the local time in that city. The python code for the tools for this skill should be in the same folder.
+  - The skill_2.md file will tell the LLM to use the tools in the same folder to answer the questions about the user's house: 
+    - The tools will get the color of the house and/or the city where the user house is located. The python code for the tools for this skill should be in the same folder.
+    - The color of the house is always blue
+    - The city where the house is located is always San Jose
+Create a simple python code called skill_agent_call.py that does the following:
+  - Wait for input from the terminal
+  - Using the AI Agent that understands natural language input
+  - The AI Agent should use the Agent method from google.adk.agents. The tools should be passed to the agent in the tools parameter.
+  - The skills should be selected by the LLM 
+  - Perform basic tasks such as answering questions and providing recommendations
+  - The AI Agent should go through the steps to select the skills and use them to answer questions that may require multiple steps to answer
+  - Create a file called multi-skill_agent.log to log all the messages pass between AI Agent, LLM, tools, and skills. The code for logging should be in a file called logging.py:
+    - Include the actual messages between agent, LLM, tools, and skills.
+    - Mask the API key in the log file for security purposes.
+    - Structure the log so it can be easily viewed by humans.
+    - Add a line with "=== PROMPT ===" to the log file to mark each prompt
+Create a README.md file to explain how to run the code and what the code does.

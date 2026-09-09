@@ -1,0 +1,87 @@
+2026-09-08 20:01:16,381 [INFO] === PROMPT ===
+2026-09-08 20:01:16,381 [INFO] [2026-09-09T03:01:16.381486+00:00] USER -> AGENT (PROMPT)
+{
+  "sender": "user",
+  "recipient": "agent",
+  "message_type": "prompt",
+  "payload": {
+    "query": "what is the time in new york now?"
+  },
+  "timestamp": "2026-09-09T03:01:16.381486+00:00"
+}
+2026-09-08 20:01:16,382 [INFO] [2026-09-09T03:01:16.382083+00:00] AGENT -> LLM (ADK_AGENT_REQUEST)
+{
+  "sender": "agent",
+  "recipient": "llm",
+  "message_type": "adk_agent_request",
+  "payload": {
+    "model": "gemma-4-26b-a4b-it",
+    "tools": [
+      "select_skill",
+      "get_weather",
+      "get_local_time",
+      "get_house_color",
+      "get_house_city",
+      "get_private_house_information"
+    ],
+    "user_message": "what is the time in new york now?"
+  },
+  "timestamp": "2026-09-09T03:01:16.382083+00:00"
+}
+2026-09-08 20:01:20,038 [INFO] [2026-09-09T03:01:20.038385+00:00] AGENT -> SKILL_1:LOCAL_TIME (TOOL_CALL)
+{
+  "sender": "agent",
+  "recipient": "skill_1:local_time",
+  "message_type": "tool_call",
+  "payload": {
+    "city": "New York"
+  },
+  "timestamp": "2026-09-09T03:01:20.038385+00:00"
+}
+2026-09-08 20:01:20,039 [INFO] [2026-09-09T03:01:20.038933+00:00] SKILL_1:LOCAL_TIME -> AGENT (TOOL_RESPONSE)
+{
+  "sender": "skill_1:local_time",
+  "recipient": "agent",
+  "message_type": "tool_response",
+  "payload": {
+    "city": "New York",
+    "local_time": "11:01:20 PM",
+    "local_date": "2026-09-08",
+    "timezone": "America/New_York",
+    "utc_offset": "-0400"
+  },
+  "timestamp": "2026-09-09T03:01:20.038933+00:00"
+}
+2026-09-08 20:01:21,019 [INFO] [2026-09-09T03:01:21.019195+00:00] LLM -> AGENT (FUNCTION_CALL_REQUESTED)
+{
+  "sender": "llm",
+  "recipient": "agent",
+  "message_type": "function_call_requested",
+  "payload": {
+    "name": "get_local_time",
+    "args": {
+      "city": "New York"
+    }
+  },
+  "timestamp": "2026-09-09T03:01:21.019195+00:00"
+}
+2026-09-08 20:01:21,019 [INFO] [2026-09-09T03:01:21.019535+00:00] LLM -> AGENT (ADK_AGENT_RESPONSE)
+{
+  "sender": "llm",
+  "recipient": "agent",
+  "message_type": "adk_agent_response",
+  "payload": {
+    "response_text": "The current time in New York is 11:01 PM on September 8, 2026."
+  },
+  "timestamp": "2026-09-09T03:01:21.019535+00:00"
+}
+2026-09-08 20:01:21,019 [INFO] [2026-09-09T03:01:21.019738+00:00] AGENT -> USER (FINAL_RESPONSE)
+{
+  "sender": "agent",
+  "recipient": "user",
+  "message_type": "final_response",
+  "payload": {
+    "response": "The current time in New York is 11:01 PM on September 8, 2026."
+  },
+  "timestamp": "2026-09-09T03:01:21.019738+00:00"
+}
