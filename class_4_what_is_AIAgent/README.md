@@ -1,0 +1,20 @@
+# What is an AI Agent?
+
+An AI Agent is an autonomous, goal-oriented orchestrator designed to perceive its environment, reason, plan, and execute multi-step tasks to achieve a specific objective.
+
+Unlike a standard LLM—which is a text generator responding to a single prompt—an AI Agent manages turn-based interactions, deciding which actions to take and which tools to call to fulfill a request. It acts as a central facilitator that coordinates different capabilities to solve complex problems.
+
+An AI Agent functions through the integration of three primary elements:
+- **The Agent (The Orchestrator):** The decision-maker that plans the workflow and manages the "brain" (the LLM) to maintain context and continuity.
+- **The Tools (The Instruments):** External functions, APIs, or software that the agent calls to perform specific, concrete actions, such as web searches, data retrieval, or calculations, which the LLM cannot perform natively.
+- **The Skills (The Techniques):** Internal, learned cognitive capabilities embedded within the AI model, such as translation, summarization, or reasoning, that define how the agent processes information.
+
+# Hands-on Labs
+
+To demonstrate these concepts, build the application with a simple tool. Make sure the app logs the complete interactions between the Agent, LLM, and the Tools.
+
+- **Environment Setup:** Configuring the necessary libraries and development environments to run agentic workflows.
+- **Task Definition:** Defining function-based tools and instructions that allow an agent to perform actions like answering domain-specific questions or processing data.
+- **Log Inspection:** Observing the interaction trace between the agent, the LLM, and the tools to understand the reasoning process and tool invocation cycle. This will help you understand how AI Agent interacts with LLM and Tools to achieve its goals.
+
+The example app in this folder called gemini_simple_agent demonstrates these concepts. The tool used by the agent is a simple function that can answer questions about the user's house, specifically the color of the house and the city where the house is located. You can create any simple tool such as a calculator, fetching the current time and date, etc.
