@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Structured Multi-Skill AI Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+</head>
+<body>
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">Antigravity Agent</h1>
+        <p class="brand-subtitle">Structured Multi-Skill Autonomous Engine</p>
+      </div>
+    </div>
+
+    <!-- Navigation Page Switcher -->
+    <nav class="header-nav" role="tablist">
+      <button id="nav-btn-chat" class="nav-tab active" role="tab" aria-selected="true" aria-controls="page-chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Page 1: Chat with Agent
+      </button>
+      <button id="nav-btn-logs" class="nav-tab" role="tab" aria-selected="false" aria-controls="page-logs">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        Page 2: Log Review
+      </button>
+    </nav>
+
+    <!-- System Status Indicator -->
+    <div class="header-status">
+      <span class="status-indicator"></span>
+      <span class="status-text">Google GenAI Active</span>
+    </div>
+  </header>
+
+  <!-- Main Application Content -->
+  <main class="app-main">
+    <!-- ================= PAGE 1: CHAT WITH AGENT ================= -->
+    <section id="page-chat" class="page-view active" role="tabpanel" aria-labelledby="nav-btn-chat">
+      <div class="chat-container">
+        <!-- Chat Toolbar / Session Controls -->
+        <div class="chat-toolbar">
+          <div class="chat-session-info">
+            <span class="session-label">Active Session:</span>
+            <span id="chat-session-badge" class="session-badge new-session">New Chat</span>
+          </div>
+          <button type="button" id="new-chat-btn" class="new-chat-btn" title="Start a fresh conversation thread">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>+ New Chat</span>
+          </button>
+        </div>
+
+        <!-- Chat History Window -->
+        <div id="chat-messages" class="chat-messages">
+          <!-- Initial Agent Introduction -->
+          <div class="message-card agent-message">
+            <div class="message-avatar">⚡</div>
+            <div class="message-body">
+              <div class="message-header">
+                <span class="message-sender">Multi-Skill Agent</span>
+                <span class="message-time">Just now</span>
+              </div>
+              <div class="message-text">
+                <p>Hello! I am your autonomous AI assistant equipped with domain skills:</p>
+                <ul class="skills-bullet-list">
+                  <li><strong>🌦️ datetime-weather-skill:</strong> Real-time weather, temperature, humidity, wind, and local clock/timezone analytics via OpenStreetMap Nominatim and Open-Meteo.</li>
+                  <li><strong>🏡 house-registry-skill:</strong> Verified property records (resident name, city, country, house color) scanned against the flat-file database without hallucinations.</li>
+                </ul>
+                <p>How can I assist you today?</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Prompt Chips -->
+        <div class="chips-container" id="prompt-chips">
+          <span class="chips-label">Try asking:</span>
+          <button class="prompt-chip" data-prompt="What is the weather and current time in Tokyo?">
+            🌤️ Weather & Time in Tokyo
+          </button>
+          <button class="prompt-chip" data-prompt="Where does Smith live and what is the house color?">
+            🏡 Smith's House Info
+          </button>
+          <button class="prompt-chip" data-prompt="What is the current weather and local time in the city where Smith lives?">
+            ⚡ Compound: Weather where Smith lives
+          </button>
+          <button class="prompt-chip" data-prompt="List all verified house records in the registry.">
+            📋 List House Registry
+          </button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="chat-form" class="chat-input-bar">
+          <input
+            type="text"
+            id="chat-input"
+            class="chat-input-field"
+            placeholder="Type your message or ask a question about weather, time, or the house registry..."
+            autocomplete="off"
+            required
+          />
+          <button type="submit" id="chat-send-btn" class="chat-send-btn">
+            <span>Send</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================= PAGE 2: LOG REVIEW ================= -->
+    <section id="page-logs" class="page-view" role="tabpanel" aria-labelledby="nav-btn-logs">
+      <div class="logs-container">
+        <!-- Table 1: Conversations -->
+        <div class="log-panel">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <h2 class="panel-title">Conversations Log</h2>
+              <span id="conversations-count" class="panel-count-badge">0 conversations</span>
+            </div>
+            <div class="panel-actions">
+              <button id="refresh-logs-btn" class="action-btn" title="Refresh logs from server">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Refresh Logs
+              </button>
+            </div>
+          </div>
+          <p class="panel-hint">Click on any conversation row to view the sequential event trace in Table 2 below.</p>
+
+          <div class="table-wrapper">
+            <table id="table-conversations" class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 22%;">Conversation ID</th>
+                  <th style="width: 18%;">Timestamp</th>
+                  <th style="width: 30%;">User Query</th>
+                  <th style="width: 30%;">Agent Response</th>
+                </tr>
+              </thead>
+              <tbody id="conversations-tbody">
+                <tr>
+                  <td colspan="4" class="table-empty">Loading conversations...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Table 2: Events of Selected Conversation -->
+        <div class="log-panel">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <h2 class="panel-title">Conversation Events Audit Trace</h2>
+              <span id="selected-conv-badge" class="panel-active-badge">Select a conversation above</span>
+              <span id="events-count" class="panel-count-badge">0 events</span>
+            </div>
+          </div>
+          <p class="panel-hint">Click on any event row to open the detailed JSON log viewer modal.</p>
+
+          <div class="table-wrapper">
+            <table id="table-events" class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 16%;">Timestamp</th>
+                  <th style="width: 18%;">Event Type</th>
+                  <th style="width: 14%;">Invoker</th>
+                  <th style="width: 16%;">Target</th>
+                  <th style="width: 36%;">Short Description</th>
+                </tr>
+              </thead>
+              <tbody id="events-tbody">
+                <tr>
+                  <td colspan="5" class="table-empty">Click a conversation row in Table 1 above to display its event trace.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= DETAILED JSON MODAL POPUP ================= -->
+  <div id="json-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span id="modal-event-type-badge" class="event-badge badge-info">EVENT</span>
+          <h3 id="modal-title" class="modal-title">Event Detail</h3>
+        </div>
+        <div class="modal-controls">
+          <button id="modal-copy-btn" class="action-btn small-btn" title="Copy formatted JSON to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy JSON</span>
+          </button>
+          <button id="modal-close-btn" class="modal-close-btn" title="Close window (Esc)" aria-label="Close">
+            &times;
+          </button>
+        </div>
+      </div>
+      <div class="modal-meta-bar">
+        <div><strong>Event ID:</strong> <span id="modal-event-id">-</span></div>
+        <div><strong>Timestamp:</strong> <span id="modal-timestamp">-</span></div>
+        <div><strong>Flow:</strong> <span id="modal-invoker-target">-</span></div>
+        <div style="width: 100%;"><strong>Description:</strong> <span id="modal-short-desc">-</span></div>
+      </div>
+      <div class="modal-body">
+        <pre><code id="modal-json-content">{}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=2"></script>
+</body>
+</html>
