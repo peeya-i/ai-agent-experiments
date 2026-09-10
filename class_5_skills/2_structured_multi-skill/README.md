@@ -25,17 +25,25 @@ antigravity-agent/
 │   │   └── scripts/
 │   │       ├── __init__.py
 │   │       └── env_tools.py           # Nominatim geocoding + Open-Meteo weather & time (No Keys Req.)
-│   └── house-registry-skill/
-│       ├── SKILL.md                   # Control manifest (YAML frontmatter & Anti-Hallucination SOP)
-│       ├── data/
-│       │   └── registry.csv           # Flat-file database for record resolution
+│   ├── house-registry-skill/
+│   │   ├── SKILL.md                   # Control manifest (YAML frontmatter & Anti-Hallucination SOP)
+│   │   ├── data/
+│   │   │   └── registry.csv           # Flat-file database for record resolution
+│   │   └── scripts/
+│   │       ├── __init__.py
+│   │       └── registry_tools.py      # Strict case-insensitive containment scanner
+│   └── plant-care-skill/
+│       ├── SKILL.md                   # Control manifest (YAML frontmatter & Horticultural SOP)
+│       ├── templates/
+│       │   └── plant_info.md          # Comprehensive plant care instructions template
 │       └── scripts/
 │           ├── __init__.py
-│           └── registry_tools.py      # Strict case-insensitive containment scanner
+│           └── plant_tools.py         # Botanical profiles & care guide formatting
 └── tests/
     ├── conftest.py                    # Pytest environment bootstrap
     ├── test_datetime_weather_skill.py # Unit tests for weather, geocoding & time
     ├── test_house_registry_skill.py   # Unit tests for registry containment lookup
+    ├── test_plant_care_skill.py       # Unit tests for plant care guides & template
     ├── test_logging.py                # Unit tests for async JSON logging & redaction
     ├── test_agent.py                  # Unit tests for GenAI client & tool execution
     └── test_integration.py            # End-to-end API and UI integration tests
@@ -55,7 +63,12 @@ antigravity-agent/
 - **Anti-Hallucination SOP (`lookup_house_record`)**: Enforces strict, case-insensitive containment scanning over verified static database records. If a record is not found, the agent explicitly states so rather than hallucinating details.
 - **Full Discovery (`list_registry_records`)**: Allows retrieving verified resident assets.
 
-### 3. Asynchronous Redacted JSON Logging (`logging.py`)
+### 3. Skill 3: `plant-care-skill`
+- **Comprehensive Care Template (`plant_info.md`)**: Horticultural template covering scientific taxonomy, soil composition & pH, light tolerances, watering routines, temperature & humidity, routine maintenance, propagation, common pests/diseases, and safety/toxicity.
+- **Dynamic Care Guide Generator (`get_plant_care_instructions`)**: Provides formatted, plant-specific care guides for popular houseplants (Monstera, Snake Plant, Fiddle Leaf Fig, Pothos, Peace Lily, etc.) and generic botanical fallbacks.
+- **Houseplant Catalog (`list_common_houseplants`)**: Curated reference catalog with pet safety classifications.
+
+### 4. Asynchronous Redacted JSON Logging (`logging.py`)
 - **Full Audit Trace**: Captures all `USER_QUERY`, `AGENT_INVOCATION`, `LLM_REQUEST`, `LLM_RESPONSE`, `TOOL_INVOCATION`, `TOOL_RESPONSE`, `EXTERNAL_API_REQUEST`, `EXTERNAL_API_RESPONSE`, and `AGENT_RESPONSE` events.
 - **Non-Blocking Asynchronous Persistence**: Background tasks write JSONL records to disk asynchronously via thread pools without blocking the main event loop.
 - **Automatic Redaction**: Redacts all Google API keys (`AIza...`), bearer tokens, and sensitive dictionary keys (`api_key`, `key`, `token`, `secret`) in stored payloads.

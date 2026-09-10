@@ -13,10 +13,14 @@ antigravity-agent/
     │   ├── SKILL.md            # Metadata & SOP for Skill 1
     │   └── scripts/
     │       └── env_tools.py    # Public Open-Meteo & Time logic (No Keys Req.)
-    └── house-registry-skill/
-        ├── SKILL.md            # Metadata & SOP for Skill 2
-        └── data/
-            └── registry.csv    # Flat-file database for record resolution
+    ├── house-registry-skill/
+    │   ├── SKILL.md            # Metadata & SOP for Skill 2
+    │   └── data/
+    │       └── registry.csv    # Flat-file database for record resolution
+    └── plant-care-skill/
+        ├── SKILL.md            # Metadata & SOP for Skill 3
+        └── templates/
+            └── plant_info.md   # Plant care instructions template
 ```
 
 ## 🧱 Core Architecture Component Highlights
@@ -34,7 +38,13 @@ antigravity-agent/
 
 - **Operational SOP**: Restricts the core orchestrator model to strict, case-insensitive containment scanning over the static database lines to completely block hallucinated data paths.
 
-### 3. Execution Orchestrator (agent.py)
+### 3. Skill 3: plant-care-skill
+
+- **Control Manifest (SKILL.md)**: Contains YAML frontmatter outlining semantic keywords (plant-care, plant-info), regular expression targets, and explicit tool binding declarations to pass to the dynamic execution layer. Any mention of "plant", "plants", "care", "caring", "instructions", "information", etc. should trigger this skill.
+
+- **Plant Care Instructions (./templates/plant_info.md)**: Contains template for the model to use to provide plant care instructions in markdown format. This format has already been provided in the `plant_info.md` file. The instruction is to add more details to the template to make it more comprehensive.
+
+### 4. Execution Orchestrator (agent.py)
 
 - Leverages from `google import genai` via the standard native SDK structure.
 
@@ -42,7 +52,7 @@ antigravity-agent/
 
 - Implements an asynchronous validation match over `response.function_calls` loops, executing the respective skill runtime pipeline and routing the generated parameters safely back into the final response synthesis stage.
 
-### 4. Other requirements
+### 5. Other requirements
 
 - The app should have a web interface with 2 pages selectable from the buttons on the top of the page.
   - Page 1: Chat with Agent

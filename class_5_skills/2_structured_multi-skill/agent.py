@@ -22,10 +22,12 @@ dotenv.load_dotenv()
 BASE_DIR = Path(__file__).parent
 sys.path.append(str(BASE_DIR / "skills" / "datetime-weather-skill" / "scripts"))
 sys.path.append(str(BASE_DIR / "skills" / "house-registry-skill" / "scripts"))
+sys.path.append(str(BASE_DIR / "skills" / "plant-care-skill" / "scripts"))
 
 # Import skill functions
 from env_tools import get_weather, get_local_time, set_external_api_logger
 from registry_tools import lookup_house_record, list_registry_records, set_registry_audit_logger
+from plant_tools import get_plant_care_instructions, get_plant_care_template, list_common_houseplants
 
 # Import logging module with fallback for pre-loaded stdlib logging
 try:
@@ -44,9 +46,11 @@ from google.genai import types
 SYSTEM_INSTRUCTION = """You are an autonomous, multi-skill AI agent with access to domain-specific tools:
 1. 'datetime-weather-skill': Real-time weather forecasts, current temperature, and local time resolution for global cities.
 2. 'house-registry-skill': Verified flat-file registry containing property records (resident name, city, country, house color).
+3. 'plant-care-skill': Botanical reference and comprehensive plant care instructions formatted according to standardized horticultural templates.
 
 CRITICAL OPERATIONAL RULES:
 - When a user asks about a resident's house (such as owner, city, country, or house color), you MUST ALWAYS use the 'lookup_house_record' or 'list_registry_records' tool. Do NOT guess or hallucinate any property information.
+- When a user mentions a plant, plants, plant care, gardening, watering, potting, propagation, soil, or asks for plant instructions, you MUST ALWAYS use the 'get_plant_care_instructions', 'get_plant_care_template', or 'list_common_houseplants' tool from 'plant-care-skill'. Always format your response adhering strictly to the comprehensive plant care markdown template.
 - If a user asks a multi-part question (such as "What is the weather and current time in the city where Smith lives?"), first resolve the city from the house registry using 'lookup_house_record', and then use 'get_weather' and 'get_local_time' for that city.
 - Always provide clear, friendly, and complete answers based strictly on the tool responses.
 """
@@ -98,6 +102,9 @@ class MultiSkillAgent:
             get_local_time,
             lookup_house_record,
             list_registry_records,
+            get_plant_care_instructions,
+            get_plant_care_template,
+            list_common_houseplants,
         ]
 
         # Mapping for execution dispatch & target labeling in audit logs
@@ -106,6 +113,9 @@ class MultiSkillAgent:
             "get_local_time": (get_local_time, "datetime-weather-skill"),
             "lookup_house_record": (lookup_house_record, "house-registry-skill"),
             "list_registry_records": (list_registry_records, "house-registry-skill"),
+            "get_plant_care_instructions": (get_plant_care_instructions, "plant-care-skill"),
+            "get_plant_care_template": (get_plant_care_template, "plant-care-skill"),
+            "list_common_houseplants": (list_common_houseplants, "plant-care-skill"),
         }
 
     def _call_model(self, model: str, contents: Any, config: types.GenerateContentConfig):

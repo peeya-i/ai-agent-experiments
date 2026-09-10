@@ -155,11 +155,18 @@ def generate_short_description(event_type: str, invoker: str, target: str, paylo
             city = res.get("city", "")
             cond = res.get("condition", "")
             temp = res.get("temperature_celsius")
+            plant_name = res.get("plant_name", "")
+            if plant_name:
+                return f"{tool}: Care guide for '{plant_name}'"
             if temp is not None:
                 return f"{tool}: {cond}, {temp}°C in {city}"
             if name and city:
                 return f"{tool}: Resident '{name}' in {city}"
             return f"{tool}: status='{status}'"
+        if isinstance(res, list):
+            return f"{tool}: {len(res)} items returned"
+        if isinstance(res, str) and len(res) > 50:
+            return f"{tool}: Content loaded ({len(res)} chars)"
         return f"{tool} returned result"
 
     if event_type == "EXTERNAL_API_REQUEST":

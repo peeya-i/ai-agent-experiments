@@ -178,6 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <ul class="skills-bullet-list">
             <li><strong>🌦️ datetime-weather-skill:</strong> Real-time weather, temperature, humidity, wind, and local clock/timezone analytics via OpenStreetMap Nominatim and Open-Meteo.</li>
             <li><strong>🏡 house-registry-skill:</strong> Verified property records (resident name, city, country, house color) scanned against the flat-file database without hallucinations.</li>
+            <li><strong>🌿 plant-care-skill:</strong> Comprehensive botanical profiles and structured plant care guides (soil, light, watering, temperature, maintenance, propagation, safety).</li>
           </ul>
           <p>How can I assist you today?</p>
         </div>
