@@ -1,4 +1,5 @@
 import os
+import sys
 from google import genai
 from google.genai import types
 import logging
@@ -11,13 +12,12 @@ except ImportError:
 
 # Configuration from .env
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3.5-flash")
-FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gemini-3.6-flash")
+MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL", "gemini-3.5-flash")
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gemini-3.5-flash-lite")
 if not GEMINI_API_KEY:
     raise EnvironmentError("GEMINI_API_KEY not set in environment or .env file")
 
-genai.configure(api_key=GEMINI_API_KEY)
-client = genai.Client()
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ==========================================
 # 1. DEFINE THE DISTINCT SKILLS
@@ -41,14 +41,16 @@ def gemini_generate(prompt: str, system_instruction: str, temperature: float = 0
 
     Returns the raw text response.
     """
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+        system_instruction=system_instruction,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+    )
     try:
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt,
-            generation_config=types.GenerationConfig(
-                temperature=temperature,
-            ),
-            system_instruction=system_instruction,
+            config=config,
         )
     except Exception as exc:
         logging.getLogger("pipeline_logger").warning(
@@ -60,10 +62,7 @@ def gemini_generate(prompt: str, system_instruction: str, temperature: float = 0
         response = client.models.generate_content(
             model=FALLBACK_MODEL,
             contents=prompt,
-            generation_config=types.GenerationConfig(
-                temperature=temperature,
-            ),
-            system_instruction=system_instruction,
+            config=config,
         )
     return response.text.strip()
 
@@ -115,9 +114,22 @@ def run_code_generation_pipeline(user_request: str, max_retries: int = 3):
     return current_code
 
 # ==========================================
-# 3. TEST THE PIPELINE
+# 3. RUN THE PIPELINE FROM TERMINAL
 # ==========================================
-# We give a tricky request to force a scenario where a validation rule might check logic
-target_task = "Write a python function called 'divide_numbers' that takes a and b, but gracefully returns 0 instead of crashing if division by zero occurs."
+if __name__ == "__main__":
+    # Check if a prompt was provided as command-line arguments (e.g. python codegen_agent_pipeline.py "Write a function...")
+    if len(sys.argv) > 1:
+        target_task = " ".join(sys.argv[1:]).strip()
+    else:
+        # Otherwise prompt interactively from terminal input
+        try:
+            target_task = input("Enter your coding task prompt (or press Enter for default): ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nExiting.")
+            sys.exit(0)
 
-final_output = run_code_generation_pipeline(target_task)
+    if not target_task:
+        target_task = "Write a python function called 'divide_numbers' that takes a and b, but gracefully returns 0 instead of crashing if division by zero occurs."
+        print(f"Using default task:\n'{target_task}'\n")
+
+    final_output = run_code_generation_pipeline(target_task)
