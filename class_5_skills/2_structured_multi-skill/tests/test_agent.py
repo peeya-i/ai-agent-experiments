@@ -65,5 +65,47 @@ def test_agent_run_plant_care_lookup(agent):
     result = asyncio.run(agent.run("How do I care for a Snake Plant at home?"))
     assert "conversation_id" in result
     assert "response" in result
+    assert "selected_skills" in result
+    assert "plant-care-skill" in result["selected_skills"]
     resp = result["response"].lower()
     assert "snake plant" in resp or "water" in resp or "light" in resp
+
+
+def test_parse_selected_skills_logic():
+    """Verify skill selection parser handles structured, unstructured, multi-skill, and NONE outputs."""
+    from agent import _parse_selected_skills
+
+    # 1. Single skill structured
+    skills, reasoning = _parse_selected_skills("SKILLS: house-registry-skill\nREASONING: Resident query.", "Where is Kim?")
+    assert skills == ["house-registry-skill"]
+
+    # 2. Multi-skill structured
+    skills, reasoning = _parse_selected_skills("SKILLS: house-registry-skill, datetime-weather-skill\nREASONING: Need house and weather.", "Weather where Smith lives?")
+    assert "house-registry-skill" in skills
+    assert "datetime-weather-skill" in skills
+
+    # 3. NONE structured
+    skills, reasoning = _parse_selected_skills("SKILLS: NONE\nREASONING: General knowledge question.", "What is the capital of France?")
+    assert skills == []
+
+    # 4. Freeform text
+    skills, reasoning = _parse_selected_skills("I recommend activating plant-care-skill to give horticultural guidelines.", "How to propagate monstera?")
+    assert skills == ["plant-care-skill"]
+
+
+def test_skill_selection_logged_in_audit_trace(agent):
+    """Verify Turn 1 skill selection generates a SKILL_SELECTION audit log event."""
+    from logging import get_conversation_events
+
+    result = asyncio.run(agent.run("Where is Kim?"))
+    conv_id = result["conversation_id"]
+    assert "house-registry-skill" in result["selected_skills"]
+
+    events = get_conversation_events(conv_id)
+    event_types = [e["event_type"] for e in events]
+    assert "SKILL_SELECTION" in event_types
+
+    selection_ev = [e for e in events if e["event_type"] == "SKILL_SELECTION"][0]
+    assert "house-registry-skill" in selection_ev["payload"]["selected_skills"]
+    assert selection_ev["payload"]["tools_bound_count"] == 2
+

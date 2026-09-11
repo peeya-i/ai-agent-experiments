@@ -381,6 +381,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return "badge-user-query";
       case "AGENT_INVOCATION":
         return "badge-agent-invoc";
+      case "SKILL_SELECTION":
+        return "badge-skill-select";
       case "LLM_REQUEST":
         return "badge-llm-req";
       case "LLM_RESPONSE":

@@ -50,7 +50,10 @@ antigravity-agent/
 
 - Binds Python function structures natively using the `tools` parameter inside `types.GenerateContentConfig()`.
 
+- The agent should use the LLM model to perform skill routing in the first turn and then use the tool calls to retrieve the data and respond to the user.
+
 - Implements an asynchronous validation match over `response.function_calls` loops, executing the respective skill runtime pipeline and routing the generated parameters safely back into the final response synthesis stage.
+
 
 ### 5. Other requirements
 

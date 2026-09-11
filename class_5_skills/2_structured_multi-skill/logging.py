@@ -96,17 +96,43 @@ def generate_short_description(event_type: str, invoker: str, target: str, paylo
 
     if event_type == "AGENT_INVOCATION":
         m = payload.get("primary_model", "LLM")
-        tools = payload.get("available_tools", [])
-        return f"Agent initialized with {m} ({len(tools)} skills/tools bound)" if tools else f"Agent initialized with {m}"
+        skills = payload.get("available_skills", [])
+        return f"Agent initialized with {m} ({len(skills)} domain skills ready)" if skills else f"Agent initialized with {m}"
+
+    if event_type == "SKILL_SELECTION":
+        skills = payload.get("selected_skills", [])
+        if isinstance(skills, list):
+            skill_str = ", ".join(skills) if skills else "NONE (General knowledge)"
+        else:
+            skill_str = str(skills)
+        tools_bound = payload.get("tools_bound_count", 0)
+        return f"Activated skill(s): {skill_str} ({tools_bound} tools bound)" if tools_bound else f"Activated skill(s): {skill_str}"
 
     if event_type == "LLM_REQUEST":
         turn = payload.get("turn", 1)
+        phase = payload.get("phase", "")
         model = payload.get("model", "LLM")
+        if phase == "skill_selection" or payload.get("purpose") == "skill_selection":
+            return f"Turn {turn}: Skill routing inquiry to {model}"
+        tools = payload.get("tools", [])
+        if tools:
+            return f"Turn {turn}: Inference request to {model} ({len(tools)} tools bound)"
         num_contents = len(payload.get("contents", []))
         return f"Turn {turn}: Inference request to {model} ({num_contents} content parts)"
 
     if event_type == "LLM_RESPONSE":
         turn = payload.get("turn") or payload.get("_metadata", {}).get("turn", 1)
+        phase = payload.get("phase") or payload.get("_metadata", {}).get("phase", "")
+        if phase == "skill_selection":
+            skills = payload.get("selected_skills") or payload.get("_metadata", {}).get("selected_skills", [])
+            if skills:
+                skill_str = ", ".join(skills) if isinstance(skills, list) else str(skills)
+                return f"Turn {turn}: Model selected skill(s): {skill_str}"
+            reasoning = payload.get("reasoning") or payload.get("_metadata", {}).get("reasoning", "")
+            if reasoning:
+                return f"Turn {turn}: Model skill routing: '{reasoning[:40]}...'"
+            return f"Turn {turn}: Skill routing response received"
+
         # Extract function call names from candidate parts or top-level
         call_names = []
         candidates = payload.get("candidates") or []
