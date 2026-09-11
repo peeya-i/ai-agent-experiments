@@ -23,14 +23,14 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 # 1. DEFINE THE DISTINCT SKILLS
 # ==========================================
 CODER_SKILL = """
-Role: You are an expert Python Developer.
-Skill: Write clean, functional Python code based on the user's requirements.
-Output Format: Your entire response must ONLY be the raw Python code block enclosed in standard ```python and ```. Do not include introductory text, explanations, or conclusions.
+Role: You are an expert Software Developer.
+Skill: Write clean, functional code based on the user's requirements.
+Output Format: Your entire response must ONLY be the raw code block enclosed in standard ``` and ```. Do not include introductory text, explanations, or conclusions.
 """
 
 VALIDATOR_SKILL = """
 Role: You are a strict Code Quality Assurance Inspector.
-Skill: Audit python code for syntax bugs, logic flaws, security vulnerabilities, or missing features based on the original prompt.
+Skill: Audit the code for syntax bugs, logic flaws, security vulnerabilities, or missing features based on the original prompt.
 Output Format: Evaluate the code. You MUST choose one of two outputs:
   - If the code contains errors or misses requirements, start your reply with 'FAIL:' followed by a detailed list of fixes required.
   - If the code is perfect and meets all requirements, respond with exactly one word: 'PASSED'
