@@ -11,6 +11,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   
+  <link rel="icon" type="image/png" href="/static/img/plane-icon.png">
+  <link rel="shortcut icon" type="image/png" href="/static/img/plane-icon.png">
+  <link rel="apple-touch-icon" href="/static/img/plane-icon.png">
+  
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -20,14 +24,17 @@
     <div class="header-container">
       <div class="brand">
         <div class="brand-badge">AI AGENTS</div>
-        <h1 class="brand-title">Wander<span>AI</span></h1>
+        <h1 class="brand-title">
+          <img src="/static/img/plane-icon.png" alt="WanderAI" class="brand-icon">
+          Wander<span>AI</span>
+        </h1>
         <p class="brand-subtitle">Autonomous Travel Pipeline</p>
       </div>
 
       <!-- Top Navigation Tabs (Requirement 6) -->
       <nav class="nav-tabs" role="tablist">
         <button id="tab-btn-generator" class="tab-btn active" role="tab" aria-selected="true" aria-controls="view-generator">
-          <span class="tab-icon">✈️</span>
+          <span class="tab-icon"><img src="/static/img/plane-icon.png" alt="" class="tab-icon-img"></span>
           <span>Itinerary Builder</span>
         </button>
         <button id="tab-btn-logs" class="tab-btn" role="tab" aria-selected="false" aria-controls="view-logs">

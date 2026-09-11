@@ -13,6 +13,10 @@ app.config['SECRET_KEY'] = 'travel-builder-secret-2026'
 def index():
     return render_template("index.html")
 
+@app.route("/favicon.ico")
+def favicon():
+    return send_file(os.path.join(app.root_path, "static", "img", "plane-icon.png"), mimetype="image/png")
+
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
     try:

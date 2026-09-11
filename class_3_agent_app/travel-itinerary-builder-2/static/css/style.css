@@ -90,12 +90,27 @@ body {
 }
 
 .brand-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   font-family: var(--font-heading);
   font-size: 1.8rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #fff;
   line-height: 1.1;
+}
+
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(56, 189, 248, 0.45));
+  transition: transform 0.3s ease;
+}
+
+.brand:hover .brand-icon {
+  transform: translateY(-2px) rotate(-6deg) scale(1.08);
 }
 
 .brand-title span {
@@ -107,6 +122,19 @@ body {
 .brand-subtitle {
   font-size: 0.82rem;
   color: var(--text-secondary);
+}
+
+.tab-icon-img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+  transition: transform 0.25s ease;
+}
+
+.tab-btn:hover .tab-icon-img {
+  transform: scale(1.15);
 }
 
 /* Nav Tabs */
