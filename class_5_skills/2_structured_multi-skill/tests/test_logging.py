@@ -80,3 +80,19 @@ def test_log_event_and_query(tmp_path):
     detail = logger.get_event_detail(ev_id)
     assert detail is not None
     assert detail["payload"]["query"] == "Hello test agent"
+
+
+def test_agent_invocation_short_description_with_selected_model():
+    """Verify AGENT_INVOCATION short description shows selected model instead of hardcoded default."""
+    from logging import generate_short_description
+
+    payload = {
+        "target_model": "gemini-3.5-flash-lite",
+        "requested_model": "gemini-3.5-flash-lite",
+        "primary_model": "gemma-4-26b-a4b-it",
+        "fallback_model": "gemini-3.5-flash-lite",
+        "available_skills": [{"name": "skill-1"}, {"name": "skill-2"}],
+    }
+    desc = generate_short_description("AGENT_INVOCATION", "User", "Agent", payload)
+    assert desc == "Agent initialized with gemini-3.5-flash-lite (2 domain skills ready)"
+

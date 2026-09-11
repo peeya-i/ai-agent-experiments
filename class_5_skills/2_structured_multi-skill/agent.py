@@ -228,6 +228,26 @@ def _serialize_payload(obj: Any) -> Any:
     return obj
 
 
+MODEL_ALIASES = {
+    "gemma 4 26b": "gemma-4-26b-a4b-it",
+    "gemma-4-26b": "gemma-4-26b-a4b-it",
+    "gemma 4 31b": "gemma-4-31b-it",
+    "gemma-4-31b": "gemma-4-31b-it",
+    "gemini 3.5 flash lite": "gemini-3.5-flash-lite",
+    "gemini-3.5-flash-lite": "gemini-3.5-flash-lite",
+    "gemini 3.8 flash": "gemini-3.8-flash",
+    "gemini-3.8-flash": "gemini-3.8-flash",
+}
+
+
+def resolve_model_name(model_name: Optional[str], default_model: str) -> str:
+    """Resolves UI / user friendly model names and aliases to canonical model IDs."""
+    if not model_name or not str(model_name).strip():
+        return default_model
+    clean = str(model_name).strip()
+    return MODEL_ALIASES.get(clean.lower(), clean)
+
+
 class MultiSkillAgent:
     """Orchestrator managing multi-skill execution with Google GenAI SDK."""
 
@@ -291,7 +311,12 @@ class MultiSkillAgent:
                     raise fb_err
             raise e
 
-    async def run(self, user_query: str, conversation_id: Optional[str] = None) -> Dict[str, Any]:
+    async def run(
+        self,
+        user_query: str,
+        conversation_id: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Execute agent workflow with Turn 1 skill routing and Turn 2 execution."""
         c_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
 
@@ -302,9 +327,16 @@ class MultiSkillAgent:
         set_external_api_logger(_ext_logger)
         set_registry_audit_logger(None)
 
+        # Resolve model to use (from request override, alias resolution, or default primary model)
+        target_model = resolve_model_name(model, self.primary_model)
+        active_model = target_model
+
         # 1. Log incoming user query and agent workflow invocation
         log_event(c_id, "USER_QUERY", "User", "Agent", {"query": user_query})
         log_event(c_id, "AGENT_INVOCATION", "User", "Agent", {
+            "model": target_model,
+            "target_model": target_model,
+            "requested_model": model,
             "primary_model": self.primary_model,
             "fallback_model": self.fallback_model,
             "query": user_query,
@@ -313,8 +345,6 @@ class MultiSkillAgent:
                 for k, v in SKILL_DEFINITIONS.items()
             ],
         })
-
-        active_model = self.primary_model
 
         # =========================================================================
         # TURN 1: Ask the model which skill to use
@@ -497,6 +527,7 @@ class MultiSkillAgent:
             "response": final_text,
             "conversation_id": c_id,
             "model_used": active_model,
+            "requested_model": model,
             "selected_skills": selected_skills,
             "total_turns": turn_count,
         })
@@ -510,6 +541,7 @@ class MultiSkillAgent:
             "conversation_id": c_id,
             "response": final_text,
             "model_used": active_model,
+            "requested_model": model,
             "selected_skills": selected_skills,
         }
 

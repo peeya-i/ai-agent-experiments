@@ -19,6 +19,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const newChatBtn = document.getElementById("new-chat-btn");
   const chatSessionBadge = document.getElementById("chat-session-badge");
 
+  // Model Selection elements
+  const modelSelect = document.getElementById("model-select");
+  const customModelWrapper = document.getElementById("custom-model-wrapper");
+  const customModelInput = document.getElementById("custom-model-input");
+
   // Log Review elements
   const refreshLogsBtn = document.getElementById("refresh-logs-btn");
   const conversationsCount = document.getElementById("conversations-count");
@@ -43,6 +48,27 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentConversationId = null;
   let selectedLogConversationId = null;
   let cachedEvents = {};
+
+  // ================= 0. Model Selection Handler =================
+  function getSelectedModel() {
+    if (!modelSelect) return null;
+    if (modelSelect.value === "__custom__") {
+      const customVal = customModelInput ? customModelInput.value.trim() : "";
+      return customVal || "gemma-4-26b-a4b-it";
+    }
+    return modelSelect.value;
+  }
+
+  if (modelSelect) {
+    modelSelect.addEventListener("change", () => {
+      if (modelSelect.value === "__custom__") {
+        customModelWrapper?.classList.remove("hidden");
+        customModelInput?.focus();
+      } else {
+        customModelWrapper?.classList.add("hidden");
+      }
+    });
+  }
 
   // ================= 1. Navigation Switching =================
   function switchPage(page) {
@@ -71,18 +97,23 @@ document.addEventListener("DOMContentLoaded", () => {
   navBtnLogs.addEventListener("click", () => switchPage("logs"));
 
   // ================= 2. Chat Functionality =================
-  function appendMessage(sender, text, timestamp = null) {
+  function appendMessage(sender, text, timestamp = null, modelBadge = null) {
     const timeStr = timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const isUser = sender === "user";
 
     const card = document.createElement("div");
     card.className = `message-card ${isUser ? "user-message" : "agent-message"}`;
 
+    const badgeHtml = (!isUser && modelBadge)
+      ? `<span class="message-model-badge" title="Model: ${escapeHtml(modelBadge)}">${escapeHtml(modelBadge)}</span>`
+      : "";
+
     card.innerHTML = `
       <div class="message-avatar">${isUser ? "👤" : "⚡"}</div>
       <div class="message-body">
         <div class="message-header">
           <span class="message-sender">${isUser ? "You" : "Multi-Skill Agent"}</span>
+          ${badgeHtml}
           <span class="message-time">${timeStr}</span>
         </div>
         <div class="message-text">${escapeHtml(text)}</div>
@@ -127,6 +158,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const text = (queryText || chatInput.value).trim();
     if (!text) return;
 
+    const chosenModel = getSelectedModel();
+
     chatInput.value = "";
     appendMessage("user", text);
     appendLoadingMessage();
@@ -138,6 +171,8 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text,
+          conversation_id: currentConversationId,
+          model: chosenModel,
         }),
       });
 
@@ -154,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         chatSessionBadge.textContent = currentConversationId;
         chatSessionBadge.classList.remove("new-session");
       }
-      appendMessage("agent", data.response);
+      appendMessage("agent", data.response, null, data.model_used);
     } catch (err) {
       removeLoadingMessage();
       appendMessage("agent", `⚠️ Error: ${err.message}`);

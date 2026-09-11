@@ -76,7 +76,8 @@ antigravity-agent/
 
 ### 4. Interactive 2-Page Web Interface
 - **Page 1: Chat with Agent**:
-  - Live conversation history feed.
+  - **Dynamic Model Selection**: Dropdown menu allowing selection between **Gemma 4 26B**, **Gemma 4 31B**, **Gemini 3.5 flash lite**, **Gemini 3.8 flash**, and a **custom text input** to enter any model name manually.
+  - Live conversation history feed with per-response model provenance badges.
   - Interactive input field and send button (Enter key enabled).
   - Quick prompt suggestion chips for one-click testing of weather, registry lookups, and compound multi-skill workflows.
 - **Page 2: Log Review**:

@@ -25,6 +25,7 @@ for attr in [
     "get_conversation_events",
     "get_event_detail",
     "redact_payload",
+    "generate_short_description",
 ]:
     if hasattr(mod, attr):
         setattr(logging, attr, getattr(mod, attr))

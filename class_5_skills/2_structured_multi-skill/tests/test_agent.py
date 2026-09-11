@@ -109,3 +109,30 @@ def test_skill_selection_logged_in_audit_trace(agent):
     assert "house-registry-skill" in selection_ev["payload"]["selected_skills"]
     assert selection_ev["payload"]["tools_bound_count"] == 2
 
+
+def test_resolve_model_name():
+    """Verify resolve_model_name handles dropdown presets, aliases, and custom inputs."""
+    from agent import resolve_model_name
+
+    assert resolve_model_name(None, "default-model") == "default-model"
+    assert resolve_model_name("", "default-model") == "default-model"
+    assert resolve_model_name("Gemma 4 26B", "default-model") == "gemma-4-26b-a4b-it"
+    assert resolve_model_name("Gemma 4 31B", "default-model") == "gemma-4-31b-it"
+    assert resolve_model_name("Gemini 3.5 flash lite", "default-model") == "gemini-3.5-flash-lite"
+    assert resolve_model_name("Gemini 3.8 flash", "default-model") == "gemini-3.8-flash"
+    assert resolve_model_name("custom-private-model-v1", "default-model") == "custom-private-model-v1"
+
+
+def test_agent_run_with_custom_model_parameter(agent):
+    """Verify agent.run accepts model parameter and logs requested_model."""
+    from logging import get_conversation_events
+
+    result = asyncio.run(agent.run("Where is Kim?", model="gemini-3.5-flash-lite"))
+    assert result["requested_model"] == "gemini-3.5-flash-lite"
+    assert "gemini-3.5-flash-lite" in result["model_used"]
+
+    events = get_conversation_events(result["conversation_id"])
+    agent_inv_ev = [e for e in events if e["event_type"] == "AGENT_INVOCATION"][0]
+    assert agent_inv_ev["payload"]["requested_model"] == "gemini-3.5-flash-lite"
+
+

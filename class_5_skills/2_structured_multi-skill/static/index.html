@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/style.css?v=3" />
 </head>
 <body>
   <!-- Top Navigation Header -->
@@ -56,12 +56,43 @@
     <!-- ================= PAGE 1: CHAT WITH AGENT ================= -->
     <section id="page-chat" class="page-view active" role="tabpanel" aria-labelledby="nav-btn-chat">
       <div class="chat-container">
-        <!-- Chat Toolbar / Session Controls -->
+        <!-- Chat Toolbar / Session Controls & Model Selection -->
         <div class="chat-toolbar">
           <div class="chat-session-info">
             <span class="session-label">Active Session:</span>
             <span id="chat-session-badge" class="session-badge new-session">New Chat</span>
           </div>
+
+          <!-- Model Selection Controls -->
+          <div class="model-selector-container">
+            <div class="model-select-wrapper">
+              <label for="model-select" class="model-select-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                </svg>
+                <span>Model:</span>
+              </label>
+              <select id="model-select" class="model-select-dropdown" aria-label="Select AI Model">
+                <option value="gemma-4-26b-a4b-it" selected>Gemma 4 26B</option>
+                <option value="gemma-4-31b-it">Gemma 4 31B</option>
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 flash lite</option>
+                <option value="gemini-3.8-flash">Gemini 3.8 flash</option>
+                <option value="__custom__">Enter manually...</option>
+              </select>
+            </div>
+
+            <!-- Manual Text Entry for Custom Model -->
+            <div id="custom-model-wrapper" class="custom-model-wrapper hidden">
+              <input
+                type="text"
+                id="custom-model-input"
+                class="custom-model-input"
+                placeholder="Enter model name manually..."
+                aria-label="Enter model name manually"
+              />
+            </div>
+          </div>
+
           <button type="button" id="new-chat-btn" class="new-chat-btn" title="Start a fresh conversation thread">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>

@@ -75,6 +75,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    model: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -101,7 +102,11 @@ async def chat_endpoint(payload: ChatRequest):
 
     try:
         agent = get_agent()
-        result = await agent.run(user_query=query, conversation_id=payload.conversation_id)
+        result = await agent.run(
+            user_query=query,
+            conversation_id=payload.conversation_id,
+            model=payload.model,
+        )
         return ChatResponse(
             conversation_id=result["conversation_id"],
             response=result["response"],

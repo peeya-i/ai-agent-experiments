@@ -95,7 +95,12 @@ def generate_short_description(event_type: str, invoker: str, target: str, paylo
         return f"User query: '{q[:60]}...'" if len(q) > 60 else f"User query: '{q}'"
 
     if event_type == "AGENT_INVOCATION":
-        m = payload.get("primary_model", "LLM")
+        m = (
+            payload.get("target_model")
+            or payload.get("model")
+            or payload.get("requested_model")
+            or payload.get("primary_model", "LLM")
+        )
         skills = payload.get("available_skills", [])
         return f"Agent initialized with {m} ({len(skills)} domain skills ready)" if skills else f"Agent initialized with {m}"
 
@@ -411,12 +416,23 @@ class AuditLogger:
                 "event_type": ev.get("event_type"),
                 "invoker": ev.get("invoker"),
                 "target": ev.get("target"),
-                "short_description": ev.get("short_description")
-                or generate_short_description(
-                    ev.get("event_type", ""),
-                    ev.get("invoker", ""),
-                    ev.get("target", ""),
-                    ev.get("payload", {}),
+                "short_description": (
+                    generate_short_description(
+                        ev.get("event_type", ""),
+                        ev.get("invoker", ""),
+                        ev.get("target", ""),
+                        ev.get("payload", {}),
+                    )
+                    if ev.get("event_type") == "AGENT_INVOCATION"
+                    else (
+                        ev.get("short_description")
+                        or generate_short_description(
+                            ev.get("event_type", ""),
+                            ev.get("invoker", ""),
+                            ev.get("target", ""),
+                            ev.get("payload", {}),
+                        )
+                    )
                 ),
                 "payload": ev.get("payload"),
                 "metadata": ev.get("metadata"),
@@ -478,6 +494,7 @@ if _current_module:
     _current_module.get_conversation_events = get_conversation_events
     _current_module.get_event_detail = get_event_detail
     _current_module.redact_payload = redact_payload
+    _current_module.generate_short_description = generate_short_description
 
 # Also copy all stdlib symbols to globals for anyone doing "from logging import getLogger"
 for _attr in dir(_stdlib_logging):

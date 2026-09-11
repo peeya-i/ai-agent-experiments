@@ -18,12 +18,18 @@ def client():
 
 
 def test_index_page_serves_html(client):
-    """Verify GET / returns 200 and serves HTML with 2 pages and tables."""
+    """Verify GET / returns 200 and serves HTML with 2 pages, model dropdown, and tables."""
     response = client.get("/")
     assert response.status_code == 200
     html = response.text
     assert "Page 1: Chat with Agent" in html
     assert "Page 2: Log Review" in html
+    assert "model-select" in html
+    assert "Gemma 4 26B" in html
+    assert "Gemma 4 31B" in html
+    assert "Gemini 3.5 flash lite" in html
+    assert "Gemini 3.8 flash" in html
+    assert "custom-model-input" in html
     assert "table-conversations" in html
     assert "table-events" in html
     assert "Short Description" in html
@@ -92,3 +98,21 @@ def test_api_key_redaction_in_logs(client):
     query_str = str(user_query_ev["payload"])
     assert "AIzaSyD3xFakeKey" not in query_str
     assert "[REDACTED_API_KEY]" in query_str
+
+
+def test_chat_endpoint_with_custom_model(client):
+    """Verify /api/chat accepts model parameter and reflects model_used."""
+    chat_resp = client.post(
+        "/api/chat",
+        json={
+            "message": "What is the capital of Japan?",
+            "model": "gemini-3.5-flash-lite",
+        }
+    )
+    assert chat_resp.status_code == 200
+    data = chat_resp.json()
+    assert "conversation_id" in data
+    assert "response" in data
+    assert "model_used" in data
+    assert "gemini-3.5-flash-lite" in data["model_used"]
+

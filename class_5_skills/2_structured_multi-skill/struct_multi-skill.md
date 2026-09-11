@@ -59,6 +59,7 @@ antigravity-agent/
 
 - The app should have a web interface with 2 pages selectable from the buttons on the top of the page.
   - Page 1: Chat with Agent
+    - There should be a drop down menu to select the model to use. The list should include Gemma 4 26B, Gemma 4 31B, Gemini 3.5 flash lite, Gemini 3.8 flash, and a place where user can enter the text manually. This selection should not be scrolled out of view when the user is scrolling through the chat history.
     - The page allows the user to chat with the agent and respond to user queries.
     - The chat should have a text input field and a send button.
     - The chat should display the conversation history.
