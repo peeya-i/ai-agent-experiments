@@ -22,7 +22,7 @@ def test_redact_payload_api_keys():
         "api_key": "secret_abc_123",
         "nested": {
             "token": "bearer_token_xyz",
-            "prompt": "Call with key AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q and execute",
+            "prompt": "Call with key AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O1234 and execute",
         },
         "items": [
             "Normal string",
