@@ -111,7 +111,6 @@ root_agent = Agent(
     generate_content_config=types.GenerateContentConfig(
         temperature=0,
     ),
-    # Add the sub_agents parameter when instructed below this line
     sub_agents=[travel_brainstormer, attractions_planner]
 )
 
