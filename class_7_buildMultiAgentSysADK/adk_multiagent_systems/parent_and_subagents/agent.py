@@ -1,30 +1,43 @@
 import os
 import sys
 import logging
-
-sys.path.append("..")
-from callback_logging import log_query_to_model, log_model_response
-from dotenv import load_dotenv
-import google.cloud.logging
-from google.adk import Agent
-from google.adk.models import Gemini
-from google.genai import types
+from pathlib import Path
 from typing import Optional, List, Dict
 
-from google.adk.tools.tool_context import ToolContext
+from dotenv import load_dotenv
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Ensure workspace root and parent paths are in sys.path
+CURRENT_DIR = Path(__file__).resolve().parent
+SYSTEMS_DIR = CURRENT_DIR.parent
+WORKSPACE_ROOT = SYSTEMS_DIR.parent
+
+for p in [str(WORKSPACE_ROOT), str(SYSTEMS_DIR), str(CURRENT_DIR)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+from adk_utils.callback_logging import (
+    setup_logging,
+    log_query_to_model,
+    log_model_response,
+)
 from adk_utils.plugins import Graceful429Plugin
+
+from google.adk import Agent
 from google.adk.apps.app import App
+from google.adk.models import Gemini
+from google.adk.tools.tool_context import ToolContext
+from google.genai import types
 
-load_dotenv()
+# Load environment variables (.env in agent directory or workspace root)
+load_dotenv(CURRENT_DIR / ".env")
+load_dotenv(WORKSPACE_ROOT / ".env")
 
-cloud_logging_client = google.cloud.logging.Client()
-cloud_logging_client.setup_logging()
+# Initialize local console logging (replaces google.cloud.logging)
+setup_logging()
 
 RETRY_OPTIONS = types.HttpRetryOptions(initial_delay=1, max_delay=3, attempts=30)
 
-# Tools (add the tool here when instructed)
+# Tools
 def save_attractions_to_state(
     tool_context: ToolContext,
     attractions: List[str]
@@ -49,7 +62,6 @@ def save_attractions_to_state(
     return {"status": "success"}
 
 # Agents
-
 attractions_planner = Agent(
     name="attractions_planner",
     model=Gemini(model=os.getenv("MODEL"), retry_options=RETRY_OPTIONS),
@@ -63,7 +75,7 @@ attractions_planner = Agent(
         """,
     before_model_callback=log_query_to_model,
     after_model_callback=log_model_response,
-    # When instructed to do so, paste the tools parameter below this line
+    # Paste the tools parameter below this line
     tools=[save_attractions_to_state]
     )
 

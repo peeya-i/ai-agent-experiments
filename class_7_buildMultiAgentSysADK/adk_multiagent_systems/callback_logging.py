@@ -1,19 +1,20 @@
-import logging
+"""Callback logging module.
 
-from google.adk.agents.callback_context import CallbackContext
-from google.adk.models import LlmResponse, LlmRequest
+Re-exports setup_logging, log_query_to_model, and log_model_response from adk_utils.callback_logging.
+"""
 
+import sys
+from pathlib import Path
 
-def log_query_to_model(callback_context: CallbackContext, llm_request: LlmRequest):
-    if llm_request.contents and llm_request.contents[-1].role == 'user':
-        for part in llm_request.contents[-1].parts:
-            if part.text:
-                logging.info("[query to %s]: %s", callback_context.agent_name, part.text)
+# Ensure adk_utils is discoverable
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-def log_model_response(callback_context: CallbackContext, llm_response: LlmResponse):
-    if llm_response.content and llm_response.content.parts:
-        for part in llm_response.content.parts:
-            if part.text:
-                logging.info("[response from %s]: %s", callback_context.agent_name, part.text)
-            elif part.function_call:
-                logging.info("[function call from %s]: %s", callback_context.agent_name, part.function_call.name)
+from adk_utils.callback_logging import (
+    setup_logging,
+    log_query_to_model,
+    log_model_response,
+)
+
+__all__ = ["setup_logging", "log_query_to_model", "log_model_response"]
