@@ -1,3 +1,5 @@
 langchain-community>=0.4.1
 wikipedia>=1.4.0
 google-adk
+flask>=3.0.0
+requests>=2.31.0

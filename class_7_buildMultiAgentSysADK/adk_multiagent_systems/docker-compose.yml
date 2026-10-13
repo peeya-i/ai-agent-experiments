@@ -2,16 +2,16 @@ services:
   agent-movie-script:
     image: agent-movie-script:latest
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: adk_multiagent_systems/Dockerfile
     container_name: agent-movie-script
     ports:
       - "8010:8010"
     env_file:
-      - .env
+      - ../.env
     volumes:
       # Mount movie_pitches so generated pitch files are saved directly to your host
-      - ./adk_multiagent_systems/movie_pitches:/app/adk_multiagent_systems/movie_pitches
+      - ./movie_pitches:/app/adk_multiagent_systems/movie_pitches
     networks:
       - agent-movie-script
     restart: unless-stopped

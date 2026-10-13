@@ -11,7 +11,6 @@ WORKDIR /app
 # Install Python dependencies
 COPY adk_multiagent_systems/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir google-adk && \
     pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy project files (existing code remains 100% untouched)
@@ -28,4 +27,4 @@ WORKDIR /app/adk_multiagent_systems
 EXPOSE 8010
 
 # Starts ADK web on 0.0.0.0 so it is reachable from host machine
-CMD ["adk", "web", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["python", "container_wrapper.py"]
