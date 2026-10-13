@@ -3,3 +3,4 @@ wikipedia>=1.4.0
 google-adk
 flask>=3.0.0
 requests>=2.31.0
+pyjwt>=2.8.0

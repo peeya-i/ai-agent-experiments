@@ -10,7 +10,7 @@ import requests
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
-from jwt_auth import decode_jwt_token
+from jwt_auth import decode_jwt_token_with_reason, extract_jwt_from_request
 
 
 # Import your existing ADK app definition
@@ -51,22 +51,20 @@ def chat():
 
     conv_id = data.get("conversation_id", f"session-{int(time.time())}")
     # -------------------------------------------------------------
-    # 1. Get Token
+    # 1. Get Token & Authenticate
     # -------------------------------------------------------------
-    auth_header = request.headers.get("Authorization", "")
-    token = data.get("jwt_token")
-    if not token and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ", 1)[1].strip()
+    token = extract_jwt_from_request(request)
     if not token:
+        logger.warning("Rejected chat request: Missing authentication token")
         return jsonify({"error": "Unauthorized: Missing authentication token"}), 401
-    # -------------------------------------------------------------
-    # 2. Authenticate Token
-    # -------------------------------------------------------------
-    payload = decode_jwt_token(token)
+
+    payload, auth_msg = decode_jwt_token_with_reason(token)
     if not payload:
-        return jsonify({"error": "Unauthorized: Invalid or expired token"}), 403
+        logger.warning(f"Rejected chat request: {auth_msg} (token prefix: {token[:20]}...)")
+        return jsonify({"error": f"Unauthorized: {auth_msg}"}), 403
+
     # -------------------------------------------------------------
-    # 3. Use Authenticated Identity in ADK
+    # 2. Use Authenticated Identity in ADK
     # -------------------------------------------------------------
     # Extract verified user email from token payload
     user_id = payload.get("email", "authenticated_user")
