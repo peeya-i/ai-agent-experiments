@@ -10,6 +10,8 @@ import requests
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from jwt_auth import decode_jwt_token
+
 
 # Import your existing ADK app definition
 from workflow_agents.agent import app as adk_app
@@ -44,11 +46,31 @@ def health():
 def chat():
     data = request.json or {}
     message = data.get("message", "")
-    conv_id = data.get("conversation_id", f"session-{int(time.time())}")
-    user_id = data.get("user_id", "default_user")
-
     if not message:
         return jsonify({"error": "Empty message prompt"}), 400
+
+    conv_id = data.get("conversation_id", f"session-{int(time.time())}")
+    # -------------------------------------------------------------
+    # 1. Get Token
+    # -------------------------------------------------------------
+    auth_header = request.headers.get("Authorization", "")
+    token = data.get("jwt_token")
+    if not token and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        return jsonify({"error": "Unauthorized: Missing authentication token"}), 401
+    # -------------------------------------------------------------
+    # 2. Authenticate Token
+    # -------------------------------------------------------------
+    payload = decode_jwt_token(token)
+    if not payload:
+        return jsonify({"error": "Unauthorized: Invalid or expired token"}), 403
+    # -------------------------------------------------------------
+    # 3. Use Authenticated Identity in ADK
+    # -------------------------------------------------------------
+    # Extract verified user email from token payload
+    user_id = payload.get("email", "authenticated_user")
+    logger.info(f"Authenticated user: {user_id} (domain: {payload.get('domain')})")
 
     logger.info(f"Executing movie script workflow for query: '{message[:60]}...'")
 
@@ -86,41 +108,5 @@ def chat():
         logger.error(f"Error during workflow execution: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-# -------------------------------------------------------------------------
-# 3. Dynamic Auto-Registration Daemon (Announces itself to Router on boot)
-# -------------------------------------------------------------------------
-def dynamic_registration_worker():
-    container_url = "http://agent-movie-script:8010"
-    payload = {
-        "id": "agent-movie-script",
-        "name": "Movie Script & Screenplay Creator",
-        "description": (
-            "Writes screenplays, movie pitches, plot outlines, and theater plays using a "
-            "writers room, researcher, critic, casting, and box office forecasting team."
-        ),
-        "url": container_url,
-        "sample_prompts": [
-            "I want a movie script and screenplay written",
-            "Write a movie script about two astronauts stranded in deep space",
-            "Write a playwright for me about two estranged siblings meeting at a train station",
-            "I need a story for theater play",
-            "Create a film pitch and plot outline for a biopic"
-        ],
-        "status": "up",
-        "is_default": False,
-        "registration_type": "API Registered"
-    }
-
-    for attempt in range(1, 30):
-        try:
-            resp = requests.post(f"{ROUTER_URL}/api/router/agents/register", json=payload, timeout=3)
-            if resp.status_code in [200, 201]:
-                logger.info(f"Registered with agents-router (attempt {attempt}).")
-                return
-        except Exception:
-            pass
-        time.sleep(2)
-
 if __name__ == "__main__":
-    threading.Thread(target=dynamic_registration_worker, daemon=True).start()
     app.run(host="0.0.0.0", port=PORT)
