@@ -9,27 +9,27 @@ An autonomous multi-agent production system built with the **Google Agent Develo
 The system implements multiple agent patterns (Sequential, Loop, and Parallel) wrapped into a unified workflow:
 
 ```mermaid
-graph TD
+flowchart TD
     User([User Prompt]) --> Greeter[greeter Agent]
     Greeter --> FilmConcept[film_concept_team SequentialAgent]
     
-    subgraph Writers Room [writers_room LoopAgent]
-        Researcher[researcher Agent <br/> Wikipedia Search] --> Screenwriter[screenwriter Agent <br/> 3-Act Outline]
-        Screenwriter --> Critic[critic Agent <br/> Feedback Loop / exit_loop]
+    subgraph WritersRoom ["writers_room (LoopAgent)"]
+        Researcher["researcher Agent <br/> Wikipedia Search"] --> Screenwriter["screenwriter Agent <br/> 3-Act Outline"]
+        Screenwriter --> Critic["critic Agent <br/> Feedback Loop / exit_loop"]
         Critic -->|Iterate up to 5x| Researcher
     end
 
-    FilmConcept --> Writers Room
+    FilmConcept --> WritersRoom
     
-    subgraph Preproduction [preproduction_team ParallelAgent]
-        BoxOffice[box_office_researcher Agent <br/> Forecast & Comps]
-        Casting[casting_agent Agent <br/> Actor Suggestions]
+    subgraph Preproduction ["preproduction_team (ParallelAgent)"]
+        BoxOffice["box_office_researcher Agent <br/> Forecast & Comps"]
+        Casting["casting_agent Agent <br/> Actor Suggestions"]
     end
 
-    Writers Room --> Preproduction
+    WritersRoom --> Preproduction
     
     Preproduction --> FileWriter[file_writer Agent]
-    FileWriter --> Output[movie_pitches/*.txt]
+    FileWriter --> Output["movie_pitches/*.txt"]
 ```
 
 ### Specialized Agents:
